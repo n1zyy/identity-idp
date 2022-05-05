@@ -11,5 +11,5 @@ token = JWT.encode(payload, private_key, 'RS256')
 uri = URI 'https://dev-api.va.gov/inherited_proofing/user_attributes'
 headers = { 'Authorization': "Bearer #{token}" }
 
-request = Net::HTTP.get_response(uri, headers)
-puts request.body
+response = Net::HTTP.get_response(uri, headers)
+puts response.body
