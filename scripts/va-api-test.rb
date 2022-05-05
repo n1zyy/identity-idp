@@ -2,7 +2,7 @@
 require 'jwt'
 require 'net/http'
 
-payload = { inherited_proofing_auth: 'mocked-auth-code-for-testing', exp: 1651943405 }
+payload = { inherited_proofing_auth: 'mocked-auth-code-for-testing', exp: 1.day.from_now.to_i }
 private_key = AppArtifacts.store.oidc_private_key
 token = JWT.encode(payload, private_key, 'RS256')
 
