@@ -6,7 +6,7 @@ require 'net/http'
 # Script to test connection to VA API, can be removed once we create code inside the IDV flow
 class VaApiTest
   def run
-    uri = URI 'https://dev-api.va.gov/inherited_proofing/user_attributes'
+    uri = URI 'https://staging-api.va.gov/inherited_proofing/user_attributes'
     headers = { Authorization: "Bearer #{jwt_token}" }
 
     response = Net::HTTP.get_response(uri, headers)
