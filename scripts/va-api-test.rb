@@ -1,4 +1,6 @@
 #!/usr/bin/env ruby
+
+# Script to test connection to VA API, can be removed once we create code inside the IDV flow
 require 'jwt'
 require 'net/http'
 
