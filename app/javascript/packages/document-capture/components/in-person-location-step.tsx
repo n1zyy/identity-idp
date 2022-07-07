@@ -1,5 +1,4 @@
 import { PageHeading, LocationCollectionItem, LocationCollection } from '@18f/identity-components';
-import { FormStepsButton } from '@18f/identity-form-steps';
 import { useI18n } from '@18f/identity-react-i18n';
 
 /**
@@ -23,7 +22,6 @@ function InPersonLocationStep() {
         <LocationCollectionItem header="BALTIMORE — Post Office &#8482;"> </LocationCollectionItem>
         <LocationCollectionItem header="COURAGE — Post Office &#8482;"> </LocationCollectionItem>
       </LocationCollection>
-      <FormStepsButton.Continue />
     </>
   );
 }
