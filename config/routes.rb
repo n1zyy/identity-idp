@@ -326,9 +326,9 @@ Rails.application.routes.draw do
       put '/capture_doc/:step' => 'capture_doc#update'
 
       get '/in_person' => 'in_person#index'
+      get '/in_person/usps_locations' => 'in_person/usps_locations#index'
       get '/in_person/:step' => 'in_person#show', as: :in_person_step
       put '/in_person/:step' => 'in_person#update'
-      get '/in_person/usps_locations' => 'in_person/usps_locations#index'
 
       # deprecated routes
       get '/confirmations' => 'personal_key#show'
