@@ -36,7 +36,11 @@ describe Users::TotpSetupController, devise: true do
       end
 
       it 'captures an analytics event' do
-        properties = { user_signed_up: true, totp_secret_present: true }
+        properties = {
+          user_signed_up: true,
+          totp_secret_present: true,
+          enabled_mfa_methods_count: 1,
+        }
 
         expect(@analytics).
           to have_received(:track_event).with(Analytics::TOTP_SETUP_VISIT, properties)
@@ -66,7 +70,11 @@ describe Users::TotpSetupController, devise: true do
       end
 
       it 'captures an analytics event' do
-        properties = { user_signed_up: false, totp_secret_present: true }
+        properties = {
+          user_signed_up: false,
+          totp_secret_present: true,
+          enabled_mfa_methods_count: 0,
+        }
 
         expect(@analytics).
           to have_received(:track_event).with(Analytics::TOTP_SETUP_VISIT, properties)
@@ -103,7 +111,7 @@ describe Users::TotpSetupController, devise: true do
           }
 
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
 
@@ -132,7 +140,7 @@ describe Users::TotpSetupController, devise: true do
           }
 
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
 
@@ -162,7 +170,7 @@ describe Users::TotpSetupController, devise: true do
           }
 
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
 
@@ -193,7 +201,7 @@ describe Users::TotpSetupController, devise: true do
           }
 
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
     end
@@ -222,26 +230,27 @@ describe Users::TotpSetupController, devise: true do
             auth_app_configuration_id: nil,
           }
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
 
       context 'when user presents correct code' do
-        let(:selected_mfa_options) { nil }
+        let(:mfa_selections) { ['auth_app'] }
         before do
           secret = ROTP::Base32.random_base32
           stub_sign_in_before_2fa
           stub_analytics
           allow(@analytics).to receive(:track_event)
           subject.user_session[:new_totp_secret] = secret
-          subject.user_session[:selected_mfa_options] = selected_mfa_options
+          subject.user_session[:mfa_selections] = mfa_selections
           allow(IdentityConfig.store).to receive(:select_multiple_mfa_options).and_return true
 
           patch :confirm, params: { name: name, code: generate_totp_code(secret) }
         end
+
         context 'when user selected only one method on account creation' do
-          it 'redirects to account_path with a success message' do
-            expect(response).to redirect_to(account_path)
+          it 'redirects to auth method confirmation path with a success message' do
+            expect(response).to redirect_to(auth_method_confirmation_path)
             expect(subject.user_session[:new_totp_secret]).to be_nil
 
             result = {
@@ -253,19 +262,15 @@ describe Users::TotpSetupController, devise: true do
             }
 
             expect(@analytics).to have_received(:track_event).
-              with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+              with('Multi-Factor Authentication Setup', result)
           end
         end
 
         context 'when user has multiple MFA methods left in user session' do
-          let(:selected_mfa_options) { ['auth_app', 'voice'] }
+          let(:mfa_selections) { ['auth_app', 'voice'] }
 
           it 'redirects to mfa confirmation path with a success message and still logs analytics' do
-            expect(response).to redirect_to(
-              auth_method_confirmation_url(
-                next_setup_choice: 'voice',
-              ),
-            )
+            expect(response).to redirect_to(phone_setup_url)
 
             result = {
               success: true,
@@ -276,7 +281,7 @@ describe Users::TotpSetupController, devise: true do
             }
 
             expect(@analytics).to have_received(:track_event).
-              with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+              with('Multi-Factor Authentication Setup', result)
           end
         end
       end
@@ -304,7 +309,7 @@ describe Users::TotpSetupController, devise: true do
           }
 
           expect(@analytics).to have_received(:track_event).
-            with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+            with('Multi-Factor Authentication Setup', result)
         end
       end
     end

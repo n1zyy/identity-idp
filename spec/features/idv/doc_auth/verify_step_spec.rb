@@ -1,34 +1,38 @@
 require 'rails_helper'
 
-feature 'doc auth verify step' do
+feature 'doc auth verify step', :js do
   include IdvStepHelper
   include DocAuthHelper
 
   let(:skip_step_completion) { false }
   let(:max_attempts) { Throttle.max_attempts(:idv_resolution) }
   let(:fake_analytics) { FakeAnalytics.new }
-  let(:user) { create(:user, :signed_up) }
   before do
-    unless skip_step_completion
-      sign_in_and_2fa_user(user)
-      complete_doc_auth_steps_before_verify_step
-    end
+    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
   end
 
-  it 'is on the correct page' do
+  it 'displays the expected content' do
+    sign_in_and_2fa_user
+    complete_doc_auth_steps_before_verify_step
+
     expect(page).to have_current_path(idv_doc_auth_verify_step)
-    expect(page).to have_content(t('doc_auth.headings.verify'))
-  end
+    expect(page).to have_content(t('headings.verify'))
+    expect(page).to have_css(
+      '.step-indicator__step--current',
+      text: t('step_indicator.flows.idv.verify_info'),
+    )
 
-  it 'masks the ssn' do
+    # SSN is masked until revealed
     expect(page).to have_text('9**-**-***4')
-    expect(page.find('.masked-text__text', text: DocAuthHelper::GOOD_SSN)).
-      to match_css('.display-none').or have_ancestor('.display-none')
+    expect(page).not_to have_text(DocAuthHelper::GOOD_SSN)
+    check t('forms.ssn.show')
+    expect(page).not_to have_text('9**-**-***4')
+    expect(page).to have_text(DocAuthHelper::GOOD_SSN)
   end
 
   it 'proceeds to the next page upon confirmation' do
-    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
-
+    sign_in_and_2fa_user
+    complete_doc_auth_steps_before_verify_step
     click_idv_continue
 
     expect(page).to have_current_path(idv_phone_path)
@@ -44,7 +48,9 @@ feature 'doc auth verify step' do
   end
 
   it 'proceeds to address page prepopulated with defaults if the user clicks change address' do
-    click_link t('doc_auth.buttons.change_address')
+    sign_in_and_2fa_user
+    complete_doc_auth_steps_before_verify_step
+    click_button t('idv.buttons.change_address_label')
 
     expect(page).to have_current_path(idv_address_path)
     expect(page).to have_selector("input[value='1 FAKE RD']")
@@ -53,11 +59,12 @@ feature 'doc auth verify step' do
   end
 
   it 'tracks when the user edits their address' do
-    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
+    sign_in_and_2fa_user
+    complete_doc_auth_steps_before_verify_step
 
-    click_link t('doc_auth.buttons.change_address')
+    click_button t('idv.buttons.change_address_label')
     fill_out_address_form_ok
-    click_idv_continue # address form
+    click_button t('forms.buttons.submit.update') # address form
 
     click_idv_continue
 
@@ -68,7 +75,10 @@ feature 'doc auth verify step' do
   end
 
   it 'proceeds to the ssn page if the user clicks change ssn and allows user to go back' do
-    click_button t('doc_auth.buttons.change_ssn')
+    sign_in_and_2fa_user
+    complete_doc_auth_steps_before_verify_step
+
+    click_button t('idv.buttons.change_ssn_label')
 
     expect(page).to have_current_path(idv_doc_auth_ssn_step)
     expect(page).to have_content(t('doc_auth.headings.ssn_update'))
@@ -78,8 +88,6 @@ feature 'doc auth verify step' do
   end
 
   it 'does not proceed to the next page if resolution fails' do
-    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
-
     sign_in_and_2fa_user
     complete_doc_auth_steps_before_ssn_step
     fill_out_ssn_form_with_ssn_that_fails_resolution
@@ -99,8 +107,6 @@ feature 'doc auth verify step' do
   end
 
   it 'does not proceed to the next page if resolution raises an exception' do
-    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
-
     sign_in_and_2fa_user
     complete_doc_auth_steps_before_ssn_step
     fill_out_ssn_form_with_ssn_that_raises_exception
@@ -120,7 +126,6 @@ feature 'doc auth verify step' do
   end
 
   it 'throttles resolution and continues when it expires' do
-    allow_any_instance_of(ApplicationController).to receive(:analytics).and_return(fake_analytics)
     sign_in_and_2fa_user
     complete_doc_auth_steps_before_ssn_step
     fill_out_ssn_form_with_ssn_that_fails_resolution
@@ -147,79 +152,73 @@ feature 'doc auth verify step' do
     end
   end
 
-  it 'shows the step indicator' do
-    expect(page).to have_css(
-      '.step-indicator__step--current',
-      text: t('step_indicator.flows.idv.verify_info'),
-    )
-  end
-
   context 'when the user lives in an AAMVA supported state' do
     it 'performs a resolution and state ID check' do
-      agent = instance_double(Idv::Agent)
-      allow(Idv::Agent).to receive(:new).and_return(agent)
-      allow(agent).to receive(:proof_resolution).and_return(
-        success: true, errors: {}, context: { stages: [] },
+      allow(IdentityConfig.store).to receive(:aamva_supported_jurisdictions).and_return(
+        [Idp::Constants::MOCK_IDV_APPLICANT[:state_id_jurisdiction]],
       )
+      expect_any_instance_of(Idv::Agent).
+        to receive(:proof_resolution).
+        with(
+          anything,
+          should_proof_state_id: true,
+          trace_id: anything,
+        ).
+        and_call_original
 
-      stub_const(
-        'Idv::Steps::VerifyBaseStep::AAMVA_SUPPORTED_JURISDICTIONS',
-        Idv::Steps::VerifyBaseStep::AAMVA_SUPPORTED_JURISDICTIONS +
-          [DocAuth::Mock::ResultResponseBuilder::DEFAULT_PII_FROM_DOC[:state_id_jurisdiction]],
-      )
-      sign_in_and_2fa_user
+      user = create(:user, :signed_up)
+      sign_in_and_2fa_user(user)
       complete_doc_auth_steps_before_verify_step
       click_idv_continue
 
-      expect(agent).to have_received(:proof_resolution).with(
-        anything, should_proof_state_id: true, trace_id: anything
-      )
+      expect(DocAuthLog.find_by(user_id: user.id).aamva).not_to be_nil
     end
   end
 
   context 'when the user does not live in an AAMVA supported state' do
     it 'does not perform the state ID check' do
-      agent = instance_double(Idv::Agent)
-      allow(Idv::Agent).to receive(:new).and_return(agent)
-      allow(agent).to receive(:proof_resolution).and_return(
-        success: true, errors: {}, context: { stages: [] },
+      allow(IdentityConfig.store).to receive(:aamva_supported_jurisdictions).and_return(
+        IdentityConfig.store.aamva_supported_jurisdictions -
+          [Idp::Constants::MOCK_IDV_APPLICANT[:state_id_jurisdiction]],
       )
+      expect_any_instance_of(Idv::Agent).
+        to receive(:proof_resolution).
+        with(
+          anything,
+          should_proof_state_id: false,
+          trace_id: anything,
+        ).
+        and_call_original
 
-      stub_const(
-        'Idv::Steps::VerifyBaseStep::AAMVA_SUPPORTED_JURISDICTIONS',
-        Idv::Steps::VerifyBaseStep::AAMVA_SUPPORTED_JURISDICTIONS -
-          [DocAuth::Mock::ResultResponseBuilder::DEFAULT_PII_FROM_DOC[:state_id_jurisdiction]],
-      )
-      sign_in_and_2fa_user
+      user = create(:user, :signed_up)
+      sign_in_and_2fa_user(user)
       complete_doc_auth_steps_before_verify_step
       click_idv_continue
 
-      expect(agent).to have_received(:proof_resolution).with(
-        anything, should_proof_state_id: false, trace_id: anything
-      )
       expect(DocAuthLog.find_by(user_id: user.id).aamva).to be_nil
     end
   end
 
   context 'when the SP is in the AAMVA banlist' do
     it 'does not perform the state ID check' do
-      agent = instance_double(Idv::Agent)
-      allow(Idv::Agent).to receive(:new).and_return(agent)
-      allow(agent).to receive(:proof_resolution).and_return(
-        success: true, errors: {}, context: { stages: [] },
-      )
-
       allow(IdentityConfig.store).to receive(:aamva_sp_banlist_issuers).
         and_return('["urn:gov:gsa:openidconnect:sp:server"]')
+      expect_any_instance_of(Idv::Agent).
+        to receive(:proof_resolution).
+        with(
+          anything,
+          should_proof_state_id: false,
+          trace_id: anything,
+        ).
+        and_call_original
 
       visit_idp_from_sp_with_ial1(:oidc)
-      sign_in_and_2fa_user
+      user = create(:user, :signed_up)
+      sign_in_and_2fa_user(user)
       complete_doc_auth_steps_before_verify_step
       click_idv_continue
 
-      expect(agent).to have_received(:proof_resolution).with(
-        anything, should_proof_state_id: false, trace_id: anything
-      )
+      expect(DocAuthLog.find_by(user_id: user.id).aamva).to be_nil
     end
   end
 
@@ -228,88 +227,33 @@ feature 'doc auth verify step' do
       sign_in_and_2fa_user
       complete_doc_auth_steps_before_verify_step
 
-      allow_any_instance_of(ApplicationController).
-          to receive(:analytics).and_return(fake_analytics)
-
       allow(DocumentCaptureSession).to receive(:find_by).
         and_return(nil)
 
-      click_continue
-      # FLAKE: this errors due to some race condition, likely due to polling in the browser
-      expect(fake_analytics).to have_logged_event(Analytics::PROOFING_RESOLUTION_RESULT_MISSING, {})
+      click_idv_continue
+      expect(fake_analytics).to have_logged_event('Proofing Resolution Result Missing', {})
       expect(page).to have_content(t('idv.failure.timeout'))
       expect(page).to have_current_path(idv_doc_auth_verify_step)
       allow(DocumentCaptureSession).to receive(:find_by).and_call_original
-      click_continue
+      click_idv_continue
       expect(page).to have_current_path(idv_phone_path)
     end
   end
 
-  context 'javascript enabled', js: true do
-    around do |example|
-      # Adjust the wait time to give the frontend time to poll for results.
-      Capybara.using_wait_time(5) do
-        example.run
-      end
-    end
+  context 'async timed out' do
+    it 'allows resubmitting form' do
+      sign_in_and_2fa_user
+      complete_doc_auth_steps_before_verify_step
 
-    it 'can toggle viewing the ssn' do
-      expect(page).to have_text('9**-**-***4')
-      expect(page).not_to have_text(DocAuthHelper::GOOD_SSN)
+      allow(DocumentCaptureSession).to receive(:find_by).
+        and_return(nil)
 
-      check t('forms.ssn.show')
-      expect(page).to have_text(DocAuthHelper::GOOD_SSN)
-      expect(page).not_to have_text('9**-**-***4')
-
-      uncheck t('forms.ssn.show')
-      expect(page).to have_text('9**-**-***4')
-      expect(page).not_to have_text(DocAuthHelper::GOOD_SSN)
-    end
-
-    it 'proceeds to the next page upon confirmation' do
       click_idv_continue
-
+      expect(page).to have_content(t('idv.failure.timeout'))
+      expect(page).to have_current_path(idv_doc_auth_verify_step)
+      allow(DocumentCaptureSession).to receive(:find_by).and_call_original
+      click_idv_continue
       expect(page).to have_current_path(idv_phone_path)
-      expect(page).to have_content(t('doc_auth.forms.doc_success'))
-    end
-
-    context 'resolution failure' do
-      let(:skip_step_completion) { true }
-
-      it 'does not proceed to the next page' do
-        sign_in_and_2fa_user
-        complete_doc_auth_steps_before_ssn_step
-        fill_out_ssn_form_with_ssn_that_fails_resolution
-        click_idv_continue
-        click_idv_continue
-
-        expect(page).to have_current_path(idv_session_errors_warning_path)
-
-        click_on t('idv.failure.button.warning')
-
-        expect(page).to have_current_path(idv_doc_auth_verify_step)
-      end
-    end
-
-    context 'async timed out' do
-      it 'allows resubmitting form' do
-        allow(DocumentCaptureSession).to receive(:find_by).
-          and_return(nil)
-        allow_any_instance_of(ApplicationController).
-          to receive(:analytics).and_return(fake_analytics)
-
-        click_continue
-        # FLAKE: this errors due to some race condition, likely due to polling in the browser
-        # expect(fake_analytics).to have_logged_event(
-        #   Analytics::PROOFING_RESOLUTION_RESULT_MISSING,
-        #   {},
-        # )
-        expect(page).to have_content(t('idv.failure.timeout'))
-        expect(page).to have_current_path(idv_doc_auth_verify_step)
-        allow(DocumentCaptureSession).to receive(:find_by).and_call_original
-        click_continue
-        expect(page).to have_current_path(idv_phone_path)
-      end
     end
   end
 end

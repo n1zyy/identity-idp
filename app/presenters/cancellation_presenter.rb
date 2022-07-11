@@ -1,7 +1,7 @@
 class CancellationPresenter
   include Rails.application.routes.url_helpers
 
-  attr_reader :referer
+  attr_reader :referer, :url_options
 
   def initialize(referer:, url_options:)
     @referer = referer
@@ -9,11 +9,7 @@ class CancellationPresenter
   end
 
   def go_back_path
-    referer_path || two_factor_options_path
-  end
-
-  def url_options
-    @url_options
+    referer_path || authentication_methods_setup_path
   end
 
   private

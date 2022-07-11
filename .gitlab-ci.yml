@@ -5,11 +5,11 @@
 
 variables:
   GITLAB_CI: 'true'
-  ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
-  IDP_CI_SHA: "sha256:4deb511a90b86f4c6bcc76d73d0a169640243df9ade5ed054a2056e1730f611f"
+  ECR_REGISTRY: '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com'
+  IDP_CI_SHA: 'sha256:db00ce3b6c4b75e449d72e19329afdde94937547a75bfbfb6ef774ed3f5d77b6'
 
 default:
-  image: "${ECR_REGISTRY}/idp/ci@${IDP_CI_SHA}"
+  image: '${ECR_REGISTRY}/idp/ci@${IDP_CI_SHA}'
 
 .bundle_install: &bundle_install
   - bundle check || bundle install --deployment --jobs=4 --retry=3 --without deploy development doc production --path vendor/ruby
@@ -105,7 +105,7 @@ install:
 
 specs:
   stage: test
-  parallel: 5
+  parallel: 7
   cache:
     - <<: *ruby_cache
     - <<: *yarn_cache
@@ -118,7 +118,7 @@ specs:
     CAPYBARA_WAIT_TIME_SECONDS: 5
     COVERAGE: 'true'
     DOCKER_DB_HOST: postgres
-    POSTGRES_DB: upaya_test
+    POSTGRES_DB: identity_idp_test
     POSTGRES_USER: postgres_user
     POSTGRES_PASSWORD: postgres_password
     POSTGRES_HOST_AUTH_METHOD: trust
@@ -149,7 +149,7 @@ specs:
     - cp -a keys.example keys
     - cp -a certs.example certs
     - cp pwned_passwords/pwned_passwords.txt.sample pwned_passwords/pwned_passwords.txt
-    - "echo -e \"test:\n  redis_url: 'redis://redis:6379/0'\n  redis_throttle_url: 'redis://localhost:6379/1'\" > config/application.yml"
+    - "echo -e \"test:\n  redis_url: 'redis://redis:6379/0'\n  redis_throttle_url: 'redis://redis:6379/1'\n  redis_irs_attempt_api_url: 'redis://redis:6379/2'\" > config/application.yml"
     - bundle exec rake db:create db:migrate --trace
     - bundle exec rake db:seed
     - bundle exec rake knapsack:rspec

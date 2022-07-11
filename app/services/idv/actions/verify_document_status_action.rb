@@ -41,17 +41,18 @@ module Idv
 
       # @param [ProofingSessionAsyncResult] async_result
       def async_state_done(async_result)
-        doc_pii_form_result = Idv::DocPiiForm.new(async_result.pii).submit
+        doc_pii_form_result = Idv::DocPiiForm.new(
+          pii: async_result.pii,
+          attention_with_barcode: async_result.attention_with_barcode?,
+        ).submit
 
-        @flow.analytics.track_event(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_PII_VALIDATION,
-          doc_pii_form_result.to_h.merge(
+        @flow.analytics.idv_doc_auth_submitted_pii_validation(
+          **doc_pii_form_result.to_h.merge(
             remaining_attempts: remaining_attempts,
             flow_path: flow_path,
           ),
         )
 
-        delete_async
         if doc_pii_form_result.success?
           extract_pii_from_doc(async_result, store_in_session: !hybrid_flow_mobile?)
 
@@ -67,14 +68,15 @@ module Idv
       end
 
       def verify_document_capture_session
+        return nil unless document_capture_session_uuid
         return @verify_document_capture_session if defined?(@verify_document_capture_session)
-        @verify_document_capture_session = if hybrid_flow_mobile?
-          document_capture_session
-        else
-          DocumentCaptureSession.find_by(
-            uuid: flow_session[verify_document_capture_session_uuid_key],
-          )
-        end
+        @verify_document_capture_session = DocumentCaptureSession.find_by(
+          uuid: document_capture_session_uuid,
+        )
+      end
+
+      def document_capture_session_uuid
+        params[:document_capture_session_uuid]
       end
 
       def async_state
@@ -99,26 +101,21 @@ module Idv
 
       def remaining_attempts
         return nil unless verify_document_capture_session
-        Throttle.for(
+        Throttle.new(
           user: verify_document_capture_session.user,
           throttle_type: :idv_doc_auth,
         ).remaining_count
       end
 
       def missing
-        delete_async
         @flow.analytics.proofing_document_result_missing
         DocumentCaptureSessionAsyncResult.missing
-      end
-
-      def delete_async
-        flow_session.delete(verify_document_capture_session_uuid_key)
       end
 
       def document_capture_analytics(message)
         @flow.analytics.doc_auth_async(
           error: message,
-          uuid: flow_session[verify_document_capture_session_uuid_key],
+          uuid: document_capture_session_uuid,
         )
       end
     end

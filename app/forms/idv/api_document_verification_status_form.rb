@@ -5,6 +5,7 @@ module Idv
 
     validate :timeout_error
     validate :failed_result
+    validates_presence_of :document_capture_session
 
     def initialize(async_state:, document_capture_session:)
       @async_state = async_state
@@ -23,7 +24,7 @@ module Idv
 
     def remaining_attempts
       return unless @document_capture_session
-      Throttle.for(
+      Throttle.new(
         user: @document_capture_session.user,
         throttle_type: :idv_doc_auth,
       ).remaining_count
@@ -43,5 +44,9 @@ module Idv
         errors.add(key, error, type: error)
       end
     end
+
+    private
+
+    attr_reader :document_capture_session
   end
 end

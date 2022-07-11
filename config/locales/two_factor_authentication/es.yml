@@ -37,8 +37,6 @@ es:
       personal_key: Clave personal
       personal_key_info: Use la clave personal de 16 caracteres que usó en la creación
         de la cuenta.
-      phone_info_html: Obtenga su código de seguridad a través de mensajes de texto /
-        SMS o de una llamada telefónica a <strong>%{phone}</strong>.
       piv_cac: Empleados del Gobierno
       piv_cac_info: Use su tarjeta PIV / CAC para asegurar su cuenta.
       sms: Mensaje de texto / SMS
@@ -51,9 +49,10 @@ es:
       webauthn: Llave de seguridad
       webauthn_info: Use su llave de seguridad para acceder a su cuenta.
       webauthn_platform: Desbloqueo facial o táctil
-      webauthn_platform_info: Utiliza tu dispositivo para verificar tu identidad. No
-        almacenamos tus huellas dactilares ni tus fotos. Esto es recomendable
-        porque previene las estafas electrónicas.
+      webauthn_platform_info: Su dispositivo escanea su cara o huella dactilar y
+        confirma que la información coincide con las imágenes que ya tiene
+        guardadas en su dispositivo. Nosotros no copiamos ni guardamos dichas
+        imágenes.
     login_options_link_text: Elige otra opción de seguridad
     login_options_title: Seleccione su opción de seguridad
     max_backup_code_login_attempts_reached: Para su seguridad, su cuenta está
@@ -142,29 +141,35 @@ es:
         dispositivo. Generaremos una nueva lista cuando haya usado el último
         código. Tenga presente que los códigos de seguridad pueden perderse con
         facilidad.
-      least_secure_label: Lo menos seguro
-      less_secure_label: Menos seguro
-      more_secure_label: Más seguro
+      configurations_added:
+        one: '(%{count} añadido)'
+        other: '(%{count} añadido)'
       phone: Mensaje de texto o de voz
-      phone_info: Reciba un código de seguridad a través de un mensaje de texto (SMS)
-        o una llamada telefónica a su dispositivo.
+      phone_info: Recibir un código seguro por medio de un mensaje de texto (SMS) o
+        una llamada telefónica.
+      phone_info_html: Recibir un código seguro por medio de un mensaje de texto (SMS)
+        o una llamada telefónica. <strong>Para esta opción es necesario que
+        elija un método de autenticación adicional.</strong>
       phone_info_no_voip: Se prohíbe el uso de servicios telefónicos basados en la web
         (VOIP) o de números de teléfono de tarificación adicional (de pago).
       piv_cac: Identificación de empleado gubernamental
       piv_cac_info: Credenciales PIV/CAC para empleados gubernamentales y del
         ejército. Únicamente versión de escritorio.
-      secure_label: Seguro
       sms: Mensaje de texto / SMS
       sms_info: Obtenga su código de seguridad a través de mensajes de texto / SMS.
+      unused_backup_code:
+        one: '(%{count} código sin usar)'
+        other: '(%{count} códigos sin usar)'
       voice: Llamada telefónica
       voice_info: Obtenga su código de seguridad a través de una llamada telefónica.
       webauthn: Clave de seguridad
       webauthn_info: Un dispositivo físico que suele tener la forma de una unidad USB
         y se conecta a su dispositivo.
       webauthn_platform: Desbloqueo facial o táctil
-      webauthn_platform_info: Utiliza tu dispositivo para verificar tu identidad. No
-        almacenamos tus huellas dactilares ni tus fotos. Esto es recomendable
-        porque previene las estafas electrónicas.
+      webauthn_platform_info: Su dispositivo escanea su cara o huella dactilar y
+        confirma que la información coincide con las imágenes que ya tiene
+        guardadas en su dispositivo. Nosotros no copiamos ni guardamos dichas
+        imágenes.
     two_factor_hspd12_choice: Se requiere autenticación adicional
     two_factor_hspd12_choice_intro: Esta aplicación requiere un mayor nivel de
       seguridad. Para poder acceder a su información, deberá verificar su

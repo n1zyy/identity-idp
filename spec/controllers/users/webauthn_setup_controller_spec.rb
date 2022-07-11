@@ -45,8 +45,13 @@ describe Users::WebauthnSetupController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::WEBAUTHN_SETUP_VISIT, platform_authenticator: false,
-                                                errors: {}, success: true)
+          with(
+            'WebAuthn Setup Visited',
+            platform_authenticator: false,
+            errors: {},
+            enabled_mfa_methods_count: 0,
+            success: true,
+          )
 
         get :new
       end
@@ -68,16 +73,25 @@ describe Users::WebauthnSetupController do
 
       it 'tracks the submission' do
         result = {
-          success: true,
-          errors: {},
+          enabled_mfa_methods_count: 3,
           mfa_method_counts: {
             auth_app: 1, phone: 1, webauthn: 1
           },
-          pii_like_keypaths: [[:mfa_method_counts, :phone]],
           multi_factor_auth_method: 'webauthn',
+          success: true,
+          errors: {},
+          pii_like_keypaths: [[:mfa_method_counts, :phone]],
         }
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_SETUP, result)
+          with('Multi-Factor Authentication Setup', result)
+
+        expect(@analytics).to receive(:track_event).
+          with(
+            'Multi-Factor Authentication: Added webauthn',
+            enabled_mfa_methods_count: 3,
+            method_name: :webauthn,
+            platform_authenticator: false,
+          )
 
         patch :confirm, params: params
       end
@@ -106,7 +120,7 @@ describe Users::WebauthnSetupController do
           mfa_method_counts: { auth_app: 1, phone: 1 },
           pii_like_keypaths: [[:mfa_method_counts, :phone]],
         }
-        expect(@analytics).to receive(:track_event).with(Analytics::WEBAUTHN_DELETED, result)
+        expect(@analytics).to receive(:track_event).with('WebAuthn Deleted', result)
 
         delete :delete, params: { id: webauthn_configuration.id }
       end
@@ -136,7 +150,7 @@ describe Users::WebauthnSetupController do
   end
 
   describe 'when signed in and account creation' do
-    let(:user) { create(:user, :signed_up) }
+    let(:user) { create(:user) }
     let(:params) do
       {
         attestation_object: attestation_object,
@@ -151,25 +165,39 @@ describe Users::WebauthnSetupController do
       allow(IdentityConfig.store).to receive(:domain_name).and_return('localhost:3000')
       controller.user_session[:webauthn_challenge] = webauthn_challenge
     end
+    context ' Multiple MFA options turned on' do
+      let(:mfa_selections) { ['webauthn_platform', 'voice'] }
 
-    context 'with multiple MFA methods chosen on account creation' do
       before do
-        controller.user_session[:selected_mfa_options] = ['webauthn_platform', 'voice']
+        controller.user_session[:mfa_selections] = mfa_selections
         allow(IdentityConfig.store).to receive(:select_multiple_mfa_options).and_return true
       end
 
-      it 'should direct user to phone page' do
-        patch :confirm, params: params
+      context 'with multiple MFA methods chosen on account creation' do
+        it 'should direct user to next method confirmation page' do
+          patch :confirm, params: params
 
-        expect(response).to redirect_to(auth_method_confirmation_url(next_setup_choice: 'voice'))
+          expect(response).to redirect_to(phone_setup_url)
+        end
+      end
+
+      context 'with a single MFA method chosen on account creation' do
+        let(:mfa_selections) { ['webauthn_platform'] }
+        it 'should direct user to second mfa suggestion page' do
+          patch :confirm, params: params
+
+          expect(response).to redirect_to(auth_method_confirmation_url)
+        end
       end
     end
 
-    context 'with a single MFA method chosen on account creation' do
-      it 'should direct user to account page' do
-        patch :confirm, params: params
+    context 'Multiple MFA options turned off' do
+      context 'with a single MFA method chosen' do
+        it 'should direct user to second mfa suggestion page' do
+          patch :confirm, params: params
 
-        expect(response).to redirect_to(account_url)
+          expect(response).to redirect_to(account_url)
+        end
       end
     end
   end

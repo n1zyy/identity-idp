@@ -6,9 +6,7 @@ module Api
     validate :valid_user
     validate :valid_password
 
-    attr_reader :password, :user_bundle
-    attr_reader :user_session, :service_provider
-    attr_reader :profile
+    attr_reader :password, :user_bundle, :user_session, :service_provider, :profile, :gpo_code
 
     def initialize(password:, jwt:, user_session:, service_provider: nil)
       @password = password
@@ -29,7 +27,7 @@ module Api
 
       response = FormResponse.new(
         success: form_valid?,
-        errors: errors.to_hash,
+        errors: errors,
         extra: extra_attributes,
       )
       [response, personal_key]
@@ -80,6 +78,7 @@ module Api
         profile: profile,
       )
       confirmation_maker.perform
+      @gpo_code = confirmation_maker.otp if FeatureManagement.reveal_gpo_code?
     end
 
     def build_profile_maker
@@ -105,20 +104,20 @@ module Api
 
     def valid_jwt
       @user_bundle = Api::UserBundleDecorator.new(user_bundle: jwt, public_key: public_key)
-    rescue JWT::DecodeError => err
-      errors.add(:jwt, "decode error: #{err.message}", type: :invalid)
-    rescue ::Api::UserBundleError => err
-      errors.add(:jwt, "malformed user bundle: #{err.message}", type: :invalid)
+    rescue JWT::DecodeError
+      errors.add(:jwt, I18n.t('idv.failure.exceptions.internal_error'), type: :decode_error)
+    rescue ::Api::UserBundleError
+      errors.add(:jwt, I18n.t('idv.failure.exceptions.internal_error'), type: :user_bundle_error)
     end
 
     def valid_user
       return if user
-      errors.add(:user, 'user not found', type: :invalid)
+      errors.add(:user, I18n.t('devise.failure.unauthenticated'), type: :invalid_user)
     end
 
     def valid_password
       return if user&.valid_password?(password)
-      errors.add(:password, 'invalid password', type: :invalid)
+      errors.add(:password, I18n.t('idv.errors.incorrect_password'), type: :invalid_password)
     end
 
     def form_valid?

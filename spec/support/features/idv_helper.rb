@@ -1,5 +1,8 @@
+require_relative 'interaction_helper'
+
 module IdvHelper
   include ActiveJob::TestHelper
+  include InteractionHelper
 
   def self.included(base)
     base.class_eval { include JavascriptDriverHelper }
@@ -24,11 +27,7 @@ module IdvHelper
   end
 
   def click_idv_continue
-    continue_button = page.find_button(t('forms.buttons.continue'), match: :first)
-    page.execute_script('arguments[0].scrollIntoView()', continue_button) if javascript_enabled?
-    continue_button.click
-    # If button shows spinner when clicked, wait for it to finish.
-    expect(page).to have_no_css('lg-spinner-button.spinner-button--spinner-active', wait: 10)
+    click_spinner_button_and_wait t('forms.buttons.continue')
   end
 
   def choose_idv_otp_delivery_method_sms
@@ -61,9 +60,11 @@ module IdvHelper
         },
       }
       if javascript_enabled?
-        idp_domain_name = "#{page.server.host}:#{page.server.port}"
-        saml_overrides[:idp_sso_target_url] = "http://#{idp_domain_name}/api/saml/auth"
-        saml_overrides[:idp_slo_target_url] = "http://#{idp_domain_name}/api/saml/logout"
+        service_provider = ServiceProvider.find_by(issuer: sp1_issuer)
+        acs_url = URI.parse(service_provider.acs_url)
+        acs_url.host = page.server.host
+        acs_url.port = page.server.port
+        service_provider.update(acs_url: acs_url.to_s)
       end
       visit_saml_authn_request_url(overrides: saml_overrides)
     elsif sp == :oidc

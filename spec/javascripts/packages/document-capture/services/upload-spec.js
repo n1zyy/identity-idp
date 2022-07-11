@@ -4,7 +4,7 @@ import upload, {
   toFormData,
   toFormEntryError,
 } from '@18f/identity-document-capture/services/upload';
-import { useSandbox } from '../../../support/sinon';
+import { useSandbox } from '@18f/identity-test-helpers';
 
 describe('document-capture/services/upload', () => {
   const sandbox = useSandbox();
@@ -167,6 +167,9 @@ describe('document-capture/services/upload', () => {
                 { field: 'front', message: 'Please fill in this field' },
                 { field: 'back', message: 'Please fill in this field' },
               ],
+              remaining_attempts: 3,
+              hints: true,
+              ocr_pii: { first_name: 'Fakey', last_name: 'McFakerson', dob: '1938-10-06' },
             }),
         }),
       ),
@@ -177,6 +180,13 @@ describe('document-capture/services/upload', () => {
       throw new Error('This is a safeguard and should never be reached, since upload should error');
     } catch (error) {
       expect(error).to.be.instanceOf(UploadFormEntriesError);
+      expect(error.remainingAttempts).to.equal(3);
+      expect(error.hints).to.be.true();
+      expect(error.pii).to.deep.equal({
+        first_name: 'Fakey',
+        last_name: 'McFakerson',
+        dob: '1938-10-06',
+      });
       expect(error.formEntryErrors[0]).to.be.instanceOf(UploadFormEntryError);
       expect(error.formEntryErrors[0].field).to.equal('front');
       expect(error.formEntryErrors[0].message).to.equal('Please fill in this field');

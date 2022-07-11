@@ -8,15 +8,17 @@ module Users
     before_action :confirm_user_authenticated_for_2fa_setup
     before_action :set_setup_presenter
 
+    helper_method :in_multi_mfa_selection_flow?
+
     def index
       @new_phone_form = NewPhoneForm.new(current_user)
-      analytics.track_event(Analytics::USER_REGISTRATION_PHONE_SETUP_VISIT)
+      track_phone_setup_visit
     end
 
     def create
       @new_phone_form = NewPhoneForm.new(current_user)
       result = @new_phone_form.submit(new_phone_form_params)
-      analytics.track_event(Analytics::MULTI_FACTOR_AUTH_PHONE_SETUP, result.to_h)
+      analytics.multi_factor_auth_phone_setup(**result.to_h)
 
       if result.success?
         handle_create_success(@new_phone_form.phone)
@@ -26,6 +28,13 @@ module Users
     end
 
     private
+
+    def track_phone_setup_visit
+      mfa_user = MfaContext.new(current_user)
+      analytics.user_registration_phone_setup_visit(
+        enabled_mfa_methods_count: mfa_user.enabled_mfa_methods_count,
+      )
+    end
 
     def set_setup_presenter
       @presenter = SetupPresenter.new(

@@ -73,7 +73,7 @@ class UserDecorator
   # This user's most recently activated profile that has also been deactivated
   # due to a password reset, or nil if there is no such profile
   def password_reset_profile
-    profile = user.profiles.order(activated_at: :desc).first
+    profile = user.profiles.where.not(activated_at: nil).order(activated_at: :desc).first
     profile if profile&.password_reset?
   end
 
@@ -82,6 +82,7 @@ class UserDecorator
       issuer: 'Login.gov',
       otp_secret_key: otp_secret_key,
       digits: TwoFactorAuthenticatable::DIRECT_OTP_LENGTH,
+      interval: IdentityConfig.store.totp_code_interval,
     }
     url = ROTP::TOTP.new(otp_secret_key, options).provisioning_uri(email)
     qrcode = RQRCode::QRCode.new(url)

@@ -6,7 +6,7 @@ describe IdvController do
       stub_sign_in
       stub_analytics
 
-      expect(@analytics).to receive(:track_event).with(Analytics::IDV_INTRO_VISIT)
+      expect(@analytics).to receive(:track_event).with('IdV: intro visited')
 
       get :index
     end
@@ -17,7 +17,7 @@ describe IdvController do
       stub_sign_in(profile.user)
       stub_analytics
 
-      expect(@analytics).to_not receive(:track_event).with(Analytics::IDV_INTRO_VISIT)
+      expect(@analytics).to_not receive(:track_event).with('IdV: intro visited')
 
       get :index
     end
@@ -28,7 +28,7 @@ describe IdvController do
         :profile,
         user: user,
       )
-      Throttle.create(throttle_type: 5, user_id: user.id, attempts: 5, attempted_at: Time.zone.now)
+      Throttle.new(throttle_type: :idv_resolution, user: user).increment_to_throttled!
 
       stub_sign_in(profile.user)
 
@@ -38,7 +38,7 @@ describe IdvController do
     end
 
     it 'redirects to account recovery if user has a password reset profile' do
-      profile = create(:profile, deactivation_reason: :password_reset)
+      profile = create(:profile, :password_reset)
       stub_sign_in(profile.user)
       allow(subject.reactivate_account_session).to receive(:started?).and_return(true)
 
@@ -72,18 +72,16 @@ describe IdvController do
 
     context 'no SP context' do
       let(:user) { build(:user, password: ControllerHelper::VALID_PASSWORD) }
+      let(:idv_sp_required) { false }
 
       before do
         stub_sign_in(user)
         session[:sp] = {}
-        allow(Identity::Hostdata).to receive(:in_datacenter?).and_return(true)
-        allow(IdentityConfig.store).to receive(:sp_context_needed_environment).and_return('prod')
+        allow(IdentityConfig.store).to receive(:idv_sp_required).and_return(idv_sp_required)
       end
 
-      context 'prod environment' do
-        before do
-          allow(Identity::Hostdata).to receive(:env).and_return('prod')
-        end
+      context 'sp required' do
+        let(:idv_sp_required) { true }
 
         it 'redirects back to the account page' do
           get :index
@@ -105,23 +103,8 @@ describe IdvController do
         end
       end
 
-      context 'non-prod environment' do
-        before do
-          allow(Identity::Hostdata).to receive(:env).and_return('staging')
-        end
-
-        it 'begins the identity proofing process' do
-          get :index
-
-          expect(response).to redirect_to idv_doc_auth_url
-        end
-      end
-
-      context 'local development' do
-        before do
-          allow(Identity::Hostdata).to receive(:env).and_return(nil)
-          allow(Identity::Hostdata).to receive(:in_datacenter?).and_return(false)
-        end
+      context 'sp not required' do
+        let(:idv_sp_required) { false }
 
         it 'begins the identity proofing process' do
           get :index

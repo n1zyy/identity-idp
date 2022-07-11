@@ -22,7 +22,7 @@ describe Users::PhoneSetupController do
         stub_sign_in_before_2fa(user)
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::USER_REGISTRATION_PHONE_SETUP_VISIT)
+          with('User Registration: phone setup visited', enabled_mfa_methods_count: 0)
         expect(NewPhoneForm).to receive(:new).with(user)
 
         get :index
@@ -63,7 +63,7 @@ describe Users::PhoneSetupController do
       }
 
       expect(@analytics).to receive(:track_event).
-        with(Analytics::MULTI_FACTOR_AUTH_PHONE_SETUP, result)
+        with('Multi-Factor Authentication: phone setup', result)
 
       patch :create, params: {
         new_phone_form: {
@@ -95,7 +95,7 @@ describe Users::PhoneSetupController do
         }
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_PHONE_SETUP, result)
+          with('Multi-Factor Authentication: phone setup', result)
 
         patch(
           :create,
@@ -135,7 +135,7 @@ describe Users::PhoneSetupController do
         }
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_PHONE_SETUP, result)
+          with('Multi-Factor Authentication: phone setup', result)
 
         patch(
           :create,
@@ -174,7 +174,7 @@ describe Users::PhoneSetupController do
         }
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_PHONE_SETUP, result)
+          with('Multi-Factor Authentication: phone setup', result)
 
         patch(
           :create,

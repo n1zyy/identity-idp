@@ -11,14 +11,14 @@ describe SignUp::CompletionsController do
       end
 
       it 'redirects to account page when SP request URL is not present' do
-          user = create(:user)
-          stub_sign_in(user)
-          subject.session[:sp] = {
-            issuer: current_sp.issuer,
-          }
-          get :show
+        user = create(:user)
+        stub_sign_in(user)
+        subject.session[:sp] = {
+          issuer: current_sp.issuer,
+        }
+        get :show
 
-          expect(response).to redirect_to account_url
+        expect(response).to redirect_to account_url
       end
 
       context 'IAL1' do
@@ -32,7 +32,7 @@ describe SignUp::CompletionsController do
           get :show
 
           expect(@analytics).to have_received(:track_event).with(
-            Analytics::USER_REGISTRATION_AGENCY_HANDOFF_PAGE_VISIT,
+            'User registration: agency handoff visited',
             ial2: false,
             ialmax: nil,
             service_provider_name: subject.decorated_session.sp_name,
@@ -63,7 +63,7 @@ describe SignUp::CompletionsController do
           get :show
 
           expect(@analytics).to have_received(:track_event).with(
-            Analytics::USER_REGISTRATION_AGENCY_HANDOFF_PAGE_VISIT,
+            'User registration: agency handoff visited',
             ial2: true,
             ialmax: nil,
             service_provider_name: subject.decorated_session.sp_name,

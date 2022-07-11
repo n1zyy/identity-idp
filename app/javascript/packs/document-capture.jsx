@@ -12,28 +12,16 @@ import {
   HelpCenterContextProvider,
 } from '@18f/identity-document-capture';
 import { isCameraCapableMobile } from '@18f/identity-device';
+import { FlowContext } from '@18f/identity-verify-flow';
 import { trackEvent } from '@18f/identity-analytics';
 
 /** @typedef {import('@18f/identity-document-capture').FlowPath} FlowPath */
 /** @typedef {import('@18f/identity-i18n').I18n} I18n */
 
 /**
- * @typedef NewRelicAgent
- *
- * @prop {(name:string,attributes:object)=>void} addPageAction Log page action to New Relic.
- * @prop {(error:Error)=>void} noticeError Log an error without affecting application behavior.
- */
-
-/**
  * @typedef LoginGov
  *
  * @prop {Record<string,string>} assets
- */
-
-/**
- * @typedef NewRelicGlobals
- *
- * @prop {NewRelicAgent=} newrelic New Relic agent.
  */
 
 /**
@@ -43,7 +31,7 @@ import { trackEvent } from '@18f/identity-analytics';
  */
 
 /**
- * @typedef {typeof window & NewRelicGlobals & LoginGovGlobals} DocumentCaptureGlobal
+ * @typedef {typeof window & LoginGovGlobals} DocumentCaptureGlobal
  */
 
 /**
@@ -53,7 +41,6 @@ import { trackEvent } from '@18f/identity-analytics';
  * @prop {string} appName
  * @prop {string} maxCaptureAttemptsBeforeTips
  * @prop {FlowPath} flowPath
- * @prop {string} startOverUrl
  * @prop {string} cancelUrl
  * @prop {string=} idvInPersonUrl
  *
@@ -103,22 +90,11 @@ const device = {
   isMobile: isCameraCapableMobile(),
 };
 
-/** @type {import('@18f/identity-document-capture/context/analytics').AddPageAction} */
-function addPageAction(action) {
+/** @type {import('@18f/identity-analytics').trackEvent} */
+function addPageAction(event, payload) {
   const { flowPath } = appRoot.dataset;
-  const payload = { ...action.payload, flow_path: flowPath };
-
-  const { newrelic } = /** @type {DocumentCaptureGlobal} */ (window);
-  if (action.key && newrelic) {
-    newrelic.addPageAction(action.key, payload);
-  }
-
-  trackEvent(action.label, payload);
+  return trackEvent(event, { ...payload, flow_path: flowPath });
 }
-
-/** @type {import('@18f/identity-document-capture/context/analytics').NoticeError} */
-const noticeError = (error) =>
-  /** @type {DocumentCaptureGlobal} */ (window).newrelic?.noticeError(error);
 
 (async () => {
   const backgroundUploadURLs = getBackgroundUploadURLs();
@@ -157,16 +133,15 @@ const noticeError = (error) =>
     maxCaptureAttemptsBeforeTips,
     appName,
     flowPath,
-    startOverUrl: startOverURL,
     cancelUrl: cancelURL,
-    idvInPersonUrl: idvInPersonURL,
+    idvInPersonUrl: inPersonURL = null,
   } = /** @type {AppRootData} */ (appRoot.dataset);
 
   const App = composeComponents(
     [AppContext.Provider, { value: { appName } }],
-    [HelpCenterContextProvider, { value: { helpCenterRedirectURL, idvInPersonURL } }],
+    [HelpCenterContextProvider, { value: { helpCenterRedirectURL } }],
     [DeviceContext.Provider, { value: device }],
-    [AnalyticsContext.Provider, { value: { addPageAction, noticeError } }],
+    [AnalyticsContext.Provider, { value: { addPageAction } }],
     [
       AcuantContextProvider,
       {
@@ -181,17 +156,23 @@ const noticeError = (error) =>
       {
         endpoint: String(appRoot.getAttribute('data-endpoint')),
         statusEndpoint: String(appRoot.getAttribute('data-status-endpoint')),
-        statusPollInterval:
-          Number(appRoot.getAttribute('data-status-poll-interval-ms')) || undefined,
-        method: isAsyncForm ? 'PUT' : 'POST',
+        statusPollInterval: Number(appRoot.getAttribute('data-status-poll-interval-ms')),
         csrf,
         isMockClient,
         backgroundUploadURLs,
         backgroundUploadEncryptKey,
         formData,
         flowPath,
-        startOverURL,
-        cancelURL,
+      },
+    ],
+    [
+      FlowContext.Provider,
+      {
+        value: {
+          cancelURL,
+          inPersonURL,
+          currentStep: 'document_capture',
+        },
       },
     ],
     [ServiceProviderContextProvider, { value: getServiceProvider() }],

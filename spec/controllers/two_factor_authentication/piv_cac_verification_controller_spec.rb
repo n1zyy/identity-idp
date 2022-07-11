@@ -98,7 +98,7 @@ describe TwoFactorAuthentication::PivCacVerificationController do
         }
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_ENTER_PIV_CAC, attributes)
+          with('Multi-Factor Authentication: enter PIV CAC visited', attributes)
 
         submit_attributes = {
           success: true,
@@ -111,7 +111,7 @@ describe TwoFactorAuthentication::PivCacVerificationController do
           with(submit_attributes)
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::USER_MARKED_AUTHED, authentication_type: :valid_2fa)
+          with('User marked authenticated', authentication_type: :valid_2fa)
 
         get :show, params: { token: 'good-token' }
       end
@@ -181,7 +181,7 @@ describe TwoFactorAuthentication::PivCacVerificationController do
         }
 
         expect(@analytics).to receive(:track_event).
-          with(Analytics::MULTI_FACTOR_AUTH_ENTER_PIV_CAC, attributes)
+          with('Multi-Factor Authentication: enter PIV CAC visited', attributes)
 
         submit_attributes = {
           success: false,
@@ -194,7 +194,8 @@ describe TwoFactorAuthentication::PivCacVerificationController do
         expect(@analytics).to receive(:track_mfa_submit_event).
           with(submit_attributes)
 
-        expect(@analytics).to receive(:track_event).with(Analytics::MULTI_FACTOR_AUTH_MAX_ATTEMPTS)
+        expect(@analytics).to receive(:track_event).
+                          with('Multi-Factor Authentication: max attempts reached')
         expect(PushNotification::HttpPush).to receive(:deliver).
           with(PushNotification::MfaLimitAccountLockedEvent.new(user: subject.current_user))
 

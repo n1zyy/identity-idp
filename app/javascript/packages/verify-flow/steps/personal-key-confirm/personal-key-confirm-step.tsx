@@ -7,7 +7,7 @@ import { getAssetPath } from '@18f/identity-assets';
 import { trackEvent } from '@18f/identity-analytics';
 import PersonalKeyStep from '../personal-key/personal-key-step';
 import PersonalKeyInput from './personal-key-input';
-import type { VerifyFlowValues } from '../..';
+import type { VerifyFlowValues } from '../../verify-flow';
 
 interface PersonalKeyConfirmStepProps extends FormStepComponentProps<VerifyFlowValues> {}
 
@@ -25,7 +25,12 @@ function PersonalKeyConfirmStep(stepProps: PersonalKeyConfirmStepProps) {
       <PersonalKeyStep {...stepProps} />
       <Modal onRequestClose={closeModalActions}>
         <div className="pin-top pin-x display-flex flex-column flex-align-center top-neg-3">
-          <img alt="" height="60" width="60" src={getAssetPath('p-key.svg')} />
+          <img
+            alt={t('idv.titles.personal_key')}
+            height="60"
+            width="60"
+            src={getAssetPath('p-key.svg')}
+          />
         </div>
         <Modal.Heading>{t('forms.personal_key.title')}</Modal.Heading>
         <Modal.Description>{t('forms.personal_key.instructions')}</Modal.Description>

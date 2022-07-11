@@ -8,14 +8,14 @@ module Idv
       private
 
       def throttle
-        @throttle ||= Throttle.for(
+        @throttle ||= Throttle.new(
           user: current_user,
           throttle_type: :idv_resolution,
         )
       end
 
       def idv_failure(result)
-        throttle.increment if result.extra.dig(:proofing_results, :exception).blank?
+        throttle.increment! if result.extra.dig(:proofing_results, :exception).blank?
         if throttle.throttled?
           @flow.analytics.track_event(
             Analytics::THROTTLER_RATE_LIMIT_TRIGGERED,
@@ -30,8 +30,7 @@ module Idv
           )
           redirect_to idv_session_errors_exception_url
         else
-          @flow.analytics.track_event(
-            Analytics::IDV_DOC_AUTH_WARNING_VISITED,
+          @flow.analytics.idv_doc_auth_warning_visited(
             step_name: self.class.name,
             remaining_attempts: throttle.remaining_count,
           )
@@ -65,7 +64,10 @@ module Idv
           uuid_prefix: ServiceProvider.find_by(issuer: sp_session[:issuer])&.app_id,
         )
 
-        flow_session[:pii_from_doc] = pii_from_doc if store_in_session
+        flow_session[:had_barcode_read_failure] = response.attention_with_barcode?
+        if store_in_session
+          flow_session[:pii_from_doc] = flow_session[:pii_from_doc].to_h.merge(pii_from_doc)
+        end
         track_document_state(pii_from_doc[:state])
       end
 
@@ -94,7 +96,7 @@ module Idv
       end
 
       def throttled_else_increment
-        Throttle.for(
+        Throttle.new(
           user: effective_user,
           throttle_type: :idv_doc_auth,
         ).throttled_else_increment?
@@ -156,10 +158,6 @@ module Idv
 
       def verify_step_document_capture_session_uuid_key
         :idv_verify_step_document_capture_session_uuid
-      end
-
-      def verify_document_capture_session_uuid_key
-        :verify_document_action_document_capture_session_uuid
       end
 
       def track_document_state(state)

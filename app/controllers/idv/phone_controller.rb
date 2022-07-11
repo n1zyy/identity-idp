@@ -8,15 +8,13 @@ module Idv
     before_action :set_idv_form
 
     def new
-      if params[:step]
-        analytics.track_event(Analytics::IDV_PHONE_USE_DIFFERENT, step: params[:step])
-      end
+      analytics.idv_phone_use_different(step: params[:step]) if params[:step]
 
       redirect_to failure_url(:fail) and return if throttle.throttled?
 
       async_state = step.async_state
       if async_state.none?
-        analytics.track_event(Analytics::IDV_PHONE_RECORD_VISIT)
+        analytics.idv_phone_of_record_visited
         render :new, locals: { gpo_letter_available: gpo_letter_available }
       elsif async_state.in_progress?
         render :wait
@@ -41,7 +39,7 @@ module Idv
     private
 
     def throttle
-      @throttle ||= Throttle.for(user: current_user, throttle_type: :proof_address)
+      @throttle ||= Throttle.new(user: current_user, throttle_type: :proof_address)
     end
 
     def max_attempts_reached
@@ -140,8 +138,11 @@ module Idv
     end
 
     def gpo_letter_available
+      return @gpo_letter_available if defined?(@gpo_letter_available)
       @gpo_letter_available ||= FeatureManagement.enable_gpo_verification? &&
-                                !Idv::GpoMail.new(current_user).mail_spammed?
+                                !Idv::GpoMail.new(current_user).mail_spammed? &&
+                                !(sp_session[:ial2_strict] &&
+                                  !IdentityConfig.store.gpo_allowed_for_strict_ial2)
     end
   end
 end

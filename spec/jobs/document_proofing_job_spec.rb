@@ -28,8 +28,9 @@ RSpec.describe DocumentProofingJob, type: :job do
     }
   end
 
+  let(:body) { { document: applicant_pii }.to_json }
+
   before do
-    body = { document: applicant_pii }.to_json
     encrypt_and_stub_s3(body: body, url: front_image_url, iv: front_image_iv, key: encryption_key)
     encrypt_and_stub_s3(body: body, url: back_image_url, iv: back_image_iv, key: encryption_key)
     encrypt_and_stub_s3(body: body, url: selfie_image_url, iv: selfie_image_iv, key: encryption_key)
@@ -130,6 +131,7 @@ RSpec.describe DocumentProofingJob, type: :job do
             doc_auth_result: 'Passed',
             billed: true,
             errors: {},
+            attention_with_barcode: false,
             image_metrics: {},
             processed_alerts: { failed: [], passed: [] },
             success: true,
@@ -138,9 +140,10 @@ RSpec.describe DocumentProofingJob, type: :job do
           )
 
           expect(job_analytics).to have_logged_event(
-            Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+            'IdV: doc auth image upload vendor submitted',
             success: true,
             errors: {},
+            attention_with_barcode: false,
             exception: nil,
             vendor: 'Acuant',
             billed: true,
@@ -177,6 +180,7 @@ RSpec.describe DocumentProofingJob, type: :job do
             vendor: 'Acuant',
             billed: true,
             errors: {},
+            attention_with_barcode: false,
             face_match_results: { is_match: true, match_score: nil },
             image_metrics: {},
             processed_alerts: { failed: [], passed: [] },
@@ -192,9 +196,10 @@ RSpec.describe DocumentProofingJob, type: :job do
           )
 
           expect(job_analytics).to have_logged_event(
-            Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+            'IdV: doc auth image upload vendor submitted',
             success: true,
             errors: {},
+            attention_with_barcode: false,
             exception: nil,
             vendor: 'Acuant',
             billed: true,
@@ -333,6 +338,45 @@ RSpec.describe DocumentProofingJob, type: :job do
         expect(DocAuthRouter).to_not receive(:doc_auth_vendor)
 
         expect { perform }.to raise_error(JobHelpers::StaleJobHelper::StaleJobError)
+      end
+    end
+
+    context 'with data url body' do
+      let(:body) { DocAuthImageFixtures.document_front_image_data_uri }
+
+      it 'decrypts the image correctly' do
+        expect_any_instance_of(DocAuth::Mock::DocAuthMockClient).
+          to receive(:post_images).
+          with(hash_including(front_image: DocAuthImageFixtures.document_front_image.b)).
+          and_call_original
+
+        perform
+      end
+    end
+
+    context 'with jpg file body' do
+      let(:body) { DocAuthImageFixtures.document_front_image }
+
+      it 'decrypts the image correctly' do
+        expect_any_instance_of(DocAuth::Mock::DocAuthMockClient).
+          to receive(:post_images).
+          with(hash_including(front_image: DocAuthImageFixtures.document_front_image.b)).
+          and_call_original
+
+        perform
+      end
+    end
+
+    context 'with invalid data url body' do
+      let(:body) { 'data:"' }
+
+      it 'gracefully degrades' do
+        expect_any_instance_of(DocAuth::Mock::DocAuthMockClient).
+          to receive(:post_images).
+          with(hash_including(front_image: nil)).
+          and_call_original
+
+        perform
       end
     end
   end

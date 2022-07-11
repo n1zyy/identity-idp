@@ -20,7 +20,6 @@ es:
       take_photo: Toma fotos de tu identificación con un teléfono
       upload: Verifica tu identificación
       verify: Verifica tu identidad
-      verify_info: Verifica tu información
     edit_info:
       email_language: Editar la preferencia de idioma del correo electrónico
       password: Edite su contraseña
@@ -40,9 +39,10 @@ es:
       phone: Verifica tu número telefónico
       reset_password: Restablecer la contraseña
       review: Vuelve a ingresar tu contraseña
+      verify_info: Verifica tu información
     mfa_setup:
-      first_authentication_method: ¡Has agregado tu primer método de autenticación!
-      multiple_authentication_methods_setup: ¡Se ha agregado un %{method_count} código de autenticación!
+      suggest_second_mfa: ¡Has agregado tu primer método de autenticación! Agrega un
+        segundo método como respaldo.
     no_auth_option: No se encontró mensaje de inicio de sesión
     openid_connect:
       authorization: Autorización de OpenID Connect

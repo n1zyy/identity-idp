@@ -69,7 +69,7 @@ describe Idv::OtpDeliveryMethodController do
       get :new
 
       expect(@analytics).to have_received(:track_event).
-        with(Analytics::IDV_PHONE_OTP_DELIVERY_SELECTION_VISIT)
+        with('IdV: Phone OTP delivery Selection Visited')
     end
   end
 
@@ -215,14 +215,14 @@ describe Idv::OtpDeliveryMethodController do
           'IdV: Phone OTP Delivery Selection Submitted', hash_including(success: true)
         )
         expect(@analytics).to receive(:track_event).ordered.with(
-          Analytics::IDV_PHONE_CONFIRMATION_OTP_SENT,
+          'IdV: phone confirmation otp sent',
           hash_including(
             success: false,
             telephony_response: telephony_response,
           ),
         )
         expect(@analytics).to receive(:track_event).ordered.with(
-          Analytics::OTP_PHONE_VALIDATION_FAILED, telephony_error_analytics_hash
+          'Vendor Phone Validation failed', telephony_error_analytics_hash
         )
 
         post :create, params: params

@@ -7,11 +7,12 @@ import {
 } from '@18f/identity-document-capture';
 import ReviewIssuesStep from '@18f/identity-document-capture/components/review-issues-step';
 import { toFormEntryError } from '@18f/identity-document-capture/services/upload';
+import { useSandbox } from '@18f/identity-test-helpers';
 import { render } from '../../../support/document-capture';
-import { useSandbox } from '../../../support/sinon';
 import { getFixtureFile } from '../../../support/file';
 
 describe('document-capture/components/review-issues-step', () => {
+  const DEFAULT_PROPS = { remainingAttempts: 3 };
   const sandbox = useSandbox();
 
   it('logs warning events', async () => {
@@ -19,31 +20,25 @@ describe('document-capture/components/review-issues-step', () => {
 
     const { getByRole } = render(
       <AnalyticsContext.Provider value={{ addPageAction }}>
-        <ReviewIssuesStep remainingAttempts={3} />
+        <ReviewIssuesStep {...DEFAULT_PROPS} />
       </AnalyticsContext.Provider>,
     );
 
-    expect(addPageAction).to.have.been.calledWith({
-      label: 'IdV: warning shown',
-      payload: {
-        location: 'doc_auth_review_issues',
-        remaining_attempts: 3,
-      },
+    expect(addPageAction).to.have.been.calledWith('IdV: warning shown', {
+      location: 'doc_auth_review_issues',
+      remaining_attempts: 3,
     });
 
     const button = getByRole('button');
     await userEvent.click(button);
 
-    expect(addPageAction).to.have.been.calledWith({
-      label: 'IdV: warning action triggered',
-      payload: {
-        location: 'doc_auth_review_issues',
-      },
+    expect(addPageAction).to.have.been.calledWith('IdV: warning action triggered', {
+      location: 'doc_auth_review_issues',
     });
   });
 
   it('renders initially with warning page and displays attempts remaining', () => {
-    const { getByRole, getByText } = render(<ReviewIssuesStep remainingAttempts={3} />);
+    const { getByRole, getByText } = render(<ReviewIssuesStep {...DEFAULT_PROPS} />);
 
     expect(getByText('errors.doc_auth.throttled_heading')).to.be.ok();
     expect(getByText('idv.failure.attempts.other')).to.be.ok();
@@ -84,7 +79,7 @@ describe('document-capture/components/review-issues-step', () => {
   });
 
   it('renders with front, back, and selfie inputs', async () => {
-    const { getByLabelText, getByRole } = render(<ReviewIssuesStep />);
+    const { getByLabelText, getByRole } = render(<ReviewIssuesStep {...DEFAULT_PROPS} />);
 
     await userEvent.click(getByRole('button', { name: 'idv.failure.button.warning' }));
 
@@ -95,7 +90,9 @@ describe('document-capture/components/review-issues-step', () => {
 
   it('calls onChange callback with uploaded image', async () => {
     const onChange = sinon.stub();
-    const { getByLabelText, getByRole } = render(<ReviewIssuesStep onChange={onChange} />);
+    const { getByLabelText, getByRole } = render(
+      <ReviewIssuesStep {...DEFAULT_PROPS} onChange={onChange} />,
+    );
     const file = await getFixtureFile('doc_auth_images/id-back.jpg');
     await userEvent.click(getByRole('button', { name: 'idv.failure.button.warning' }));
 
@@ -131,7 +128,7 @@ describe('document-capture/components/review-issues-step', () => {
         backgroundUploadURLs={{ back: 'about:blank#back' }}
         backgroundUploadEncryptKey={key}
       >
-        <ReviewIssuesStep onChange={onChange} />)
+        <ReviewIssuesStep {...DEFAULT_PROPS} onChange={onChange} />)
       </UploadContextProvider>,
     );
 
@@ -156,7 +153,7 @@ describe('document-capture/components/review-issues-step', () => {
           isLivenessRequired: false,
         }}
       >
-        <ReviewIssuesStep />
+        <ReviewIssuesStep {...DEFAULT_PROPS} />
       </ServiceProviderContextProvider>,
     );
 
@@ -184,7 +181,7 @@ describe('document-capture/components/review-issues-step', () => {
               isLivenessRequired: false,
             }}
           >
-            <ReviewIssuesStep />
+            <ReviewIssuesStep {...DEFAULT_PROPS} />
           </ServiceProviderContextProvider>,
         );
         await userEvent.click(getByRole('button', { name: 'idv.failure.button.warning' }));
@@ -205,7 +202,7 @@ describe('document-capture/components/review-issues-step', () => {
               isLivenessRequired: true,
             }}
           >
-            <ReviewIssuesStep />
+            <ReviewIssuesStep {...DEFAULT_PROPS} />
           </ServiceProviderContextProvider>,
         );
         await userEvent.click(getByRole('button', { name: 'idv.failure.button.warning' }));
@@ -214,6 +211,24 @@ describe('document-capture/components/review-issues-step', () => {
         expect(getByLabelText('doc_auth.headings.document_capture_back')).to.be.ok();
         expect(getByLabelText('doc_auth.headings.document_capture_selfie')).to.be.ok();
       });
+    });
+  });
+
+  context('with barcode attention error', () => {
+    it('renders initially with warning page', () => {
+      async () => {
+        const { getByRole, getByText } = render(
+          <ReviewIssuesStep
+            pii={{ first_name: 'Fakey', last_name: 'McFakerson', dob: '1938-10-06' }}
+          />,
+        );
+
+        expect(getByText('doc_auth.errors.barcode_attention.heading')).to.be.ok();
+
+        await userEvent.click(getByRole('button', { name: 'doc_auth.buttons.add_new_photos' }));
+
+        expect(getByText('doc_auth.headings.review_issues')).to.be.ok();
+      };
     });
   });
 });

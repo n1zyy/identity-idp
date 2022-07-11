@@ -19,6 +19,7 @@ describe Profile do
 
   it { is_expected.to belong_to(:user) }
   it { is_expected.to have_many(:gpo_confirmation_codes).dependent(:destroy) }
+  it { is_expected.to have_one(:in_person_enrollment).dependent(:destroy) }
 
   describe '#proofing_components' do
     let(:profile) { create(:profile, proofing_components: proofing_components) }
@@ -102,7 +103,7 @@ describe Profile do
     context 'the letter flow is allowed for strict IAL2' do
       before do
         allow(IdentityConfig.store).to receive(
-          :usps_upload_allowed_for_strict_ial2,
+          :gpo_allowed_for_strict_ial2,
         ).and_return(true)
       end
 
@@ -124,7 +125,7 @@ describe Profile do
     context 'the letter flow is not allowed for strict IAL2' do
       before do
         allow(IdentityConfig.store).to receive(
-          :usps_upload_allowed_for_strict_ial2,
+          :gpo_allowed_for_strict_ial2,
         ).and_return(false)
       end
 

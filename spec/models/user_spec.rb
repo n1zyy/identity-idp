@@ -11,39 +11,22 @@ RSpec.describe User do
     it { is_expected.to have_many(:phone_configurations) }
     it { is_expected.to have_many(:webauthn_configurations) }
     it { is_expected.to have_one(:proofing_component) }
-    it { is_expected.to have_many(:throttles) }
+    it { is_expected.to have_many(:in_person_enrollments).dependent(:destroy) }
+    it {
+      is_expected.to have_one(:pending_in_person_enrollment).
+      conditions(status: :pending).
+      order(created_at: :desc).
+      class_name('InPersonEnrollment').
+      with_foreign_key(:user_id).
+      inverse_of(:user).
+      dependent(:destroy)
+    }
   end
 
   it 'does not send an email when #create is called' do
     expect do
       User.create(email: 'nobody@nobody.com')
     end.to change(ActionMailer::Base.deliveries, :count).by(0)
-  end
-
-  describe 'email_address' do
-    it 'creates an entry for the user when created' do
-      expect do
-        User.create(email: 'nobody@nobody.com')
-      end.to change(EmailAddress, :count).by(1)
-    end
-
-    it 'mirrors the info from the user object on creation' do
-      user = create(:user)
-      email_address = user.email_addresses.first
-      expect(email_address).to be_present
-      expect(email_address.encrypted_email).to eq user.encrypted_email
-      expect(email_address.email).to eq user.email
-      expect(email_address.confirmed_at.to_i).to eq user.confirmed_at.to_i
-    end
-
-    it 'mirrors the info from an unconfirmed user object' do
-      user = create(:user, :unconfirmed)
-      email_address = user.email_addresses.first
-      expect(email_address).to be_present
-      expect(email_address.encrypted_email).to eq user.encrypted_email
-      expect(email_address.email).to eq user.email
-      expect(email_address.confirmed_at).to be_nil
-    end
   end
 
   describe 'password validations' do
@@ -207,6 +190,76 @@ RSpec.describe User do
     end
   end
 
+  context 'when user has IPP enrollments' do
+    let(:user) { create(:user, :signed_up) }
+
+    let(:profile1) {
+      create(:profile, :verification_cancelled, user: user, pii: { first_name: 'Jane' })
+    }
+    let(:profile2) {
+      create(:profile, :verification_pending, user: user, pii: { first_name: 'Susan' })
+    }
+
+    let!(:enrollment1) { create(:in_person_enrollment, :failed, user: user, profile: profile1) }
+    let!(:enrollment2) { create(:in_person_enrollment, :pending, user: user, profile: profile2) }
+
+    describe '#in_person_enrollments' do
+      it 'returns multiple IPP enrollments' do
+        expect(user.in_person_enrollments).to eq [enrollment1, enrollment2]
+      end
+
+      it 'deletes everything and does not result in an error when'\
+      ' the user is deleted before the profile' do
+        enrollment_id1 = enrollment1.id
+        enrollment_id2 = enrollment2.id
+        profile_id1 = profile1.id
+        profile_id2 = profile2.id
+        user_id = user.id
+
+        expect(User.find_by(id: user_id)).to eq user
+        expect(Profile.find_by(id: profile_id1)).to eq profile1
+        expect(Profile.find_by(id: profile_id2)).to eq profile2
+        expect(InPersonEnrollment.find_by(id: enrollment_id1)).to eq enrollment1
+        expect(InPersonEnrollment.find_by(id: enrollment_id2)).to eq enrollment2
+        user.destroy
+        expect(User.find_by(id: user_id)).to eq nil
+        expect(Profile.find_by(id: profile_id1)).to eq nil
+        expect(Profile.find_by(id: profile_id2)).to eq nil
+        expect(InPersonEnrollment.find_by(id: enrollment_id1)).to eq nil
+        expect(InPersonEnrollment.find_by(id: enrollment_id2)).to eq nil
+        profile1.destroy # Profile is already deleted, but we shouldn't get an error here.
+      end
+
+      it 'deletes everything under the profile and does not result in an'\
+      ' error when the profile is deleted before the user' do
+        enrollment_id1 = enrollment1.id
+        enrollment_id2 = enrollment2.id
+        profile_id1 = profile1.id
+        profile_id2 = profile2.id
+        user_id = user.id
+
+        expect(User.find_by(id: user_id)).to eq user
+        expect(Profile.find_by(id: profile_id1)).to eq profile1
+        expect(Profile.find_by(id: profile_id2)).to eq profile2
+        expect(InPersonEnrollment.find_by(id: enrollment_id1)).to eq enrollment1
+        expect(InPersonEnrollment.find_by(id: enrollment_id2)).to eq enrollment2
+        profile1.destroy
+        expect(User.find_by(id: user_id)).to eq user
+        expect(Profile.find_by(id: profile_id1)).to eq nil
+        expect(Profile.find_by(id: profile_id2)).to eq profile2
+        expect(InPersonEnrollment.find_by(id: enrollment_id1)).to eq nil
+        expect(InPersonEnrollment.find_by(id: enrollment_id2)).to eq enrollment2
+        user.destroy # Should work even though first profile was deleted after user was loaded
+      end
+    end
+
+    describe '#pending_in_person_enrollment' do
+      it 'returns the pending IPP enrollment' do
+        expect(user.pending_in_person_enrollment).to eq enrollment2
+      end
+    end
+  end
+
   describe 'deleting identities' do
     it 'does not delete identities when the user is destroyed preventing uuid reuse' do
       user = create(:user, :signed_up)
@@ -249,7 +302,7 @@ RSpec.describe User do
       it 'normalizes email' do
         user = create(:user, email: 'FoO@example.org    ')
 
-        expect(user.email).to eq 'foo@example.org'
+        expect(user.email_addresses.first.email).to eq 'foo@example.org'
       end
     end
 
@@ -377,13 +430,13 @@ RSpec.describe User do
         user = User.new
         _old_profile = create(
           :profile,
-          deactivation_reason: :verification_pending,
+          :verification_pending,
           created_at: 1.day.ago,
           user: user,
         )
         new_profile = create(
           :profile,
-          deactivation_reason: :verification_pending,
+          :verification_pending,
           user: user,
         )
 
@@ -396,7 +449,7 @@ RSpec.describe User do
         user = User.new
         create(
           :profile,
-          deactivation_reason: :password_reset,
+          :password_reset,
           created_at: 1.day.ago,
           user: user,
         )
@@ -490,6 +543,24 @@ RSpec.describe User do
 
         it { expect(user.broken_personal_key?).to eq(false) }
       end
+    end
+
+    context 'for a user that has encrypted profile data that is suspiciously too short' do
+      let(:user) { create(:user) }
+      let(:personal_key) { RandomPhrase.new(num_words: 4).to_s }
+
+      before do
+        create(
+          :profile,
+          user: user,
+          active: true,
+          verified_at: Time.zone.now,
+          encrypted_pii_recovery: Encryption::Encryptors::PiiEncryptor.new(personal_key).
+            encrypt('null', user_uuid: user.uuid),
+        )
+      end
+
+      it { expect(user.broken_personal_key?).to eq(true) }
     end
   end
 end

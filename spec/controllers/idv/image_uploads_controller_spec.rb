@@ -40,7 +40,7 @@ describe Idv::ImageUploadsController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted,',
           success: false,
           errors: {
             front: ['Please fill in this field.'],
@@ -53,10 +53,10 @@ describe Idv::ImageUploadsController do
           remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
           pii_like_keypaths: [[:pii]],
           flow_path: 'standard',
-        )
+        ).exactly(0).times
 
         expect(@analytics).not_to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
           any_args,
         )
 
@@ -95,7 +95,7 @@ describe Idv::ImageUploadsController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted',
           success: false,
           errors: {
             front: [I18n.t('doc_auth.errors.not_a_file')],
@@ -111,7 +111,8 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).not_to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
+          # Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
           any_args,
         )
 
@@ -148,13 +149,7 @@ describe Idv::ImageUploadsController do
     context 'throttling' do
       it 'returns remaining_attempts with error' do
         params.delete(:front)
-        create(
-          :throttle,
-          :with_throttled,
-          attempts: IdentityConfig.store.doc_auth_max_attempts - 4,
-          user: user,
-          throttle_type: :idv_doc_auth,
-        )
+        Throttle.new(throttle_type: :idv_doc_auth, user: user).increment!
 
         action
 
@@ -163,13 +158,14 @@ describe Idv::ImageUploadsController do
           {
             success: false,
             errors: [{ field: 'front', message: 'Please fill in this field.' }],
-            remaining_attempts: 3,
+            remaining_attempts: Throttle.max_attempts(:idv_doc_auth) - 2,
+            ocr_pii: nil,
           },
         )
       end
 
       it 'returns an error when throttled' do
-        create(:throttle, :with_throttled, user: user, throttle_type: :idv_doc_auth)
+        Throttle.new(throttle_type: :idv_doc_auth, user: user).increment_to_throttled!
 
         action
 
@@ -180,23 +176,18 @@ describe Idv::ImageUploadsController do
             errors: [{ field: 'limit', message: 'We could not verify your ID' }],
             redirect: idv_session_errors_throttled_url,
             remaining_attempts: 0,
+            ocr_pii: nil,
           },
         )
       end
 
       it 'tracks analytics' do
-        create(
-          :throttle,
-          :with_throttled,
-          attempts: IdentityConfig.store.doc_auth_max_attempts,
-          user: user,
-          throttle_type: :idv_doc_auth,
-        )
+        Throttle.new(throttle_type: :idv_doc_auth, user: user).increment_to_throttled!
 
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted',
           success: false,
           errors: {
             limit: [I18n.t('errors.doc_auth.throttled_heading')],
@@ -212,7 +203,7 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).not_to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
           any_args,
         )
 
@@ -235,7 +226,7 @@ describe Idv::ImageUploadsController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted',
           success: true,
           errors: {},
           user_id: user.uuid,
@@ -246,9 +237,10 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
           success: true,
           errors: {},
+          attention_with_barcode: false,
           async: false,
           billed: true,
           exception: nil,
@@ -267,9 +259,10 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_PII_VALIDATION,
+          'IdV: doc auth image upload vendor pii validation',
           success: true,
           errors: {},
+          attention_with_barcode: false,
           user_id: user.uuid,
           attempts: 1,
           remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
@@ -314,7 +307,7 @@ describe Idv::ImageUploadsController do
             stub_analytics
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+              'IdV: doc auth image upload form submitted',
               success: true,
               errors: {},
               user_id: user.uuid,
@@ -325,9 +318,10 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+              'IdV: doc auth image upload vendor submitted',
               success: true,
               errors: {},
+              attention_with_barcode: false,
               async: false,
               billed: true,
               exception: nil,
@@ -346,7 +340,7 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_PII_VALIDATION,
+              'IdV: doc auth image upload vendor pii validation',
               success: false,
               errors: {
                 pii: [I18n.t('doc_auth.errors.alerts.full_name_check')],
@@ -354,6 +348,7 @@ describe Idv::ImageUploadsController do
               error_details: {
                 pii: [I18n.t('doc_auth.errors.alerts.full_name_check')],
               },
+              attention_with_barcode: false,
               user_id: user.uuid,
               attempts: 1,
               remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
@@ -372,7 +367,7 @@ describe Idv::ImageUploadsController do
             stub_analytics
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+              'IdV: doc auth image upload form submitted',
               success: true,
               errors: {},
               user_id: user.uuid,
@@ -383,9 +378,10 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+              'IdV: doc auth image upload vendor submitted',
               success: true,
               errors: {},
+              attention_with_barcode: false,
               async: false,
               billed: true,
               exception: nil,
@@ -404,7 +400,7 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_PII_VALIDATION,
+              'IdV: doc auth image upload vendor pii validation',
               success: false,
               errors: {
                 pii: [I18n.t('doc_auth.errors.general.no_liveness')],
@@ -412,6 +408,7 @@ describe Idv::ImageUploadsController do
               error_details: {
                 pii: [I18n.t('doc_auth.errors.general.no_liveness')],
               },
+              attention_with_barcode: false,
               user_id: user.uuid,
               attempts: 1,
               remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
@@ -430,7 +427,7 @@ describe Idv::ImageUploadsController do
             stub_analytics
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+              'IdV: doc auth image upload form submitted',
               success: true,
               errors: {},
               user_id: user.uuid,
@@ -441,9 +438,10 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+              'IdV: doc auth image upload vendor submitted',
               success: true,
               errors: {},
+              attention_with_barcode: false,
               async: false,
               billed: true,
               exception: nil,
@@ -462,7 +460,7 @@ describe Idv::ImageUploadsController do
             )
 
             expect(@analytics).to receive(:track_event).with(
-              Analytics::IDV_DOC_AUTH_SUBMITTED_PII_VALIDATION,
+              'IdV: doc auth image upload vendor pii validation',
               success: false,
               errors: {
                 pii: [I18n.t('doc_auth.errors.alerts.birth_date_checks')],
@@ -470,6 +468,7 @@ describe Idv::ImageUploadsController do
               error_details: {
                 pii: [I18n.t('doc_auth.errors.alerts.birth_date_checks')],
               },
+              attention_with_barcode: false,
               user_id: user.uuid,
               attempts: 1,
               remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
@@ -512,7 +511,7 @@ describe Idv::ImageUploadsController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted',
           success: true,
           errors: {},
           user_id: user.uuid,
@@ -523,13 +522,15 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
           success: false,
           errors: {
             front: [I18n.t('doc_auth.errors.general.multiple_front_id_failures')],
           },
+          attention_with_barcode: false,
           user_id: user.uuid,
           attempts: 1,
+          billed: nil,
           remaining_attempts: IdentityConfig.store.doc_auth_max_attempts - 1,
           state: nil,
           state_id_type: nil,
@@ -539,6 +540,7 @@ describe Idv::ImageUploadsController do
             front: { glare: 99.99 },
             back: { glare: 99.99 },
           },
+          doc_auth_result: nil,
           pii_like_keypaths: [[:pii]],
           flow_path: 'standard',
         )
@@ -571,7 +573,7 @@ describe Idv::ImageUploadsController do
         stub_analytics
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_FORM,
+          'IdV: doc auth image upload form submitted',
           success: true,
           errors: {},
           user_id: user.uuid,
@@ -582,13 +584,14 @@ describe Idv::ImageUploadsController do
         )
 
         expect(@analytics).to receive(:track_event).with(
-          Analytics::IDV_DOC_AUTH_SUBMITTED_IMAGE_UPLOAD_VENDOR,
+          'IdV: doc auth image upload vendor submitted',
           success: false,
           errors: {
             general: [I18n.t('doc_auth.errors.alerts.barcode_content_check')],
             back: [I18n.t('doc_auth.errors.general.fallback_field_level')],
             hints: true,
           },
+          attention_with_barcode: false,
           async: false,
           billed: true,
           doc_auth_result: 'Caution',

@@ -15,6 +15,7 @@ require 'email_spec'
 require 'factory_bot'
 require 'view_component/test_helpers'
 require 'capybara/rspec'
+require 'capybara/webmock'
 
 # Checks for pending migrations before tests are run.
 # If you are not using ActiveRecord, you can remove this line.
@@ -65,6 +66,19 @@ RSpec.configure do |config|
     end
   end
 
+  if !ENV['CI']
+    config.before(js: true) do
+      # rubocop:disable Style/GlobalVars
+      next if defined?($ran_asset_build)
+      $ran_asset_build = true
+      # rubocop:enable Style/GlobalVars
+      print '                       Bundling JavaScript and stylesheets... '
+      system 'WEBPACK_PORT= yarn build > /dev/null 2>&1'
+      system 'yarn build:css > /dev/null 2>&1'
+      puts '✨ Done!'
+    end
+  end
+
   config.before(:each) do
     I18n.locale = :en
   end
@@ -90,6 +104,7 @@ RSpec.configure do |config|
     Telephony::Test::Message.clear_messages
     Telephony::Test::Call.clear_calls
     PushNotification::LocalEventQueue.clear!
+    REDIS_THROTTLE_POOL.with { |namespaced| namespaced.redis.flushdb }
   end
 
   config.before(:each) do
@@ -100,9 +115,15 @@ RSpec.configure do |config|
     descendants.each(&:disable_test_adapter)
   end
 
+  config.before(:each) do
+    IrsAttemptsApi::RedisClient.clear_attempts!
+  end
+
   config.around(:each, type: :feature) do |example|
     Bullet.enable = true
+    Capybara::Webmock.start
     example.run
+    Capybara::Webmock.stop
     Bullet.enable = false
   end
 

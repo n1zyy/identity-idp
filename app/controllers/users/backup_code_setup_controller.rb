@@ -6,36 +6,30 @@ module Users
 
     before_action :authenticate_user!
     before_action :confirm_user_authenticated_for_2fa_setup
-    before_action :ensure_backup_codes_in_session, only: %i[continue download refreshed]
+    before_action :ensure_backup_codes_in_session, only: %i[continue refreshed]
     before_action :set_backup_code_setup_presenter
     before_action :apply_secure_headers_override
+    before_action :authorize_backup_code_disable, only: [:delete]
 
-    def index; end
+    helper_method :in_multi_mfa_selection_flow?
+
+    def index
+      track_backup_codes_confirmation_setup_visit
+    end
 
     def create
       generate_codes
       result = BackupCodeSetupForm.new(current_user).submit
       analytics.track_event(Analytics::BACKUP_CODE_SETUP_VISIT, result.to_h)
-      analytics.track_event(Analytics::BACKUP_CODE_CREATED)
-      Funnel::Registration::AddMfa.call(current_user.id, 'backup_codes')
       save_backup_codes
+      track_backup_codes_created
     end
 
     def edit; end
 
     def continue
       flash[:success] = t('notices.backup_codes_configured')
-      next_mfa_setup_for_user = user_session.dig(
-        :selected_mfa_options,
-        determine_next_mfa_selection,
-      )
-      redirect_to user_next_authentication_setup_path(next_mfa_setup_for_user) ||
-                  after_mfa_setup_path
-    end
-
-    def download
-      data = user_session[:backup_codes].join("\r\n") + "\r\n"
-      send_data data, filename: 'backup_codes.txt'
+      redirect_to next_setup_path || after_mfa_setup_path
     end
 
     def confirm_delete; end
@@ -55,6 +49,24 @@ module Users
     end
 
     private
+
+    def track_backup_codes_created
+      analytics.track_event(
+        Analytics::BACKUP_CODE_CREATED,
+        enabled_mfa_methods_count: mfa_user.enabled_mfa_methods_count,
+      )
+      Funnel::Registration::AddMfa.call(current_user.id, 'backup_codes')
+    end
+
+    def mfa_user
+      @mfa_user ||= MfaContext.new(current_user)
+    end
+
+    def track_backup_codes_confirmation_setup_visit
+      analytics.multi_factor_auth_enter_backup_code_confirmation_visit(
+        enabled_mfa_methods_count: mfa_user.enabled_mfa_methods_count,
+      )
+    end
 
     def ensure_backup_codes_in_session
       redirect_to backup_code_setup_url unless user_session[:backup_codes]
@@ -94,6 +106,11 @@ module Users
 
     def generator
       @generator ||= BackupCodeGenerator.new(current_user)
+    end
+
+    def authorize_backup_code_disable
+      return if MfaPolicy.new(current_user).multiple_non_restricted_factors_enabled?
+      redirect_to account_two_factor_authentication_path
     end
   end
 end

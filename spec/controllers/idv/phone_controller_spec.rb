@@ -68,7 +68,7 @@ describe Idv::PhoneController do
 
     context 'when the user is throttled' do
       before do
-        create(:throttle, :with_throttled, user: user, throttle_type: :proof_address)
+        Throttle.new(throttle_type: :proof_address, user: user).increment_to_throttled!
       end
 
       it 'redirects to fail' do
@@ -91,7 +91,7 @@ describe Idv::PhoneController do
         get :new, params: params
 
         expect(@analytics).to have_received(:track_event).
-          with(Analytics::IDV_PHONE_USE_DIFFERENT, step: step)
+          with('IdV: use different phone number', step: step)
       end
     end
 
@@ -382,13 +382,10 @@ describe Idv::PhoneController do
         before do
           user = create(:user, with: { phone: '+1 (415) 555-0130' })
           stub_verify_steps_one_and_two(user)
-
-          create(
-            :throttle,
-            user: user,
-            throttle_type: :proof_address,
-            attempts: max_attempts - 1,
-          )
+          throttle = Throttle.new(throttle_type: :proof_address, user: user)
+          (max_attempts - 1).times do
+            throttle.increment!
+          end
         end
 
         it 'tracks throttled event' do

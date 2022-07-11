@@ -41,14 +41,14 @@ module Users
     end
 
     def render_prompt
-      analytics.track_event(Analytics::USER_REGISTRATION_PIV_CAC_SETUP_VISIT)
+      analytics.user_registration_piv_cac_setup_visit
       @presenter = PivCacAuthenticationLoginPresenter.new(piv_cac_login_form, url_options)
       render :new
     end
 
     def process_piv_cac_login
       result = piv_cac_login_form.submit
-      analytics.track_event(Analytics::PIV_CAC_LOGIN, result.to_h)
+      analytics.piv_cac_login(**result.to_h)
       clear_piv_cac_information
       clear_piv_cac_nonce
       if result.success?
@@ -106,8 +106,7 @@ module Users
     def mark_user_session_authenticated(authentication_type)
       user_session[TwoFactorAuthenticatable::NEED_AUTHENTICATION] = false
       user_session[:authn_at] = Time.zone.now
-      analytics.track_event(
-        Analytics::USER_MARKED_AUTHED,
+      analytics.user_marked_authed(
         authentication_type: authentication_type,
       )
     end

@@ -3,6 +3,7 @@ class Profile < ApplicationRecord
 
   belongs_to :user
   has_many :gpo_confirmation_codes, dependent: :destroy
+  has_one :in_person_enrollment, dependent: :destroy
 
   validates :active, uniqueness: { scope: :user_id, if: :active? }
 
@@ -93,7 +94,7 @@ class Profile < ApplicationRecord
   def strict_ial2_proofed?
     return false unless active
     return false unless includes_liveness_check?
-    return true if IdentityConfig.store.usps_upload_allowed_for_strict_ial2
+    return true if IdentityConfig.store.gpo_allowed_for_strict_ial2
     includes_phone_check?
   end
 

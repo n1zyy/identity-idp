@@ -2,6 +2,7 @@ module TwoFactorAuthenticatableMethods # rubocop:disable Metrics/ModuleLength
   extend ActiveSupport::Concern
   include RememberDeviceConcern
   include SecureHeadersConcern
+  include MfaSetupConcern
 
   DELIVERY_METHOD_MAP = {
     authenticator: 'authenticator',
@@ -17,14 +18,14 @@ module TwoFactorAuthenticatableMethods # rubocop:disable Metrics/ModuleLength
   end
 
   def handle_second_factor_locked_user(type)
-    analytics.track_event(Analytics::MULTI_FACTOR_AUTH_MAX_ATTEMPTS)
+    analytics.multi_factor_auth_max_attempts
     event = PushNotification::MfaLimitAccountLockedEvent.new(user: current_user)
     PushNotification::HttpPush.deliver(event)
     handle_max_attempts(type + '_login_attempts')
   end
 
   def handle_too_many_otp_sends
-    analytics.track_event(Analytics::MULTI_FACTOR_AUTH_MAX_SENDS)
+    analytics.multi_factor_auth_max_sends
     handle_max_attempts('otp_requests')
   end
 
@@ -150,9 +151,17 @@ module TwoFactorAuthenticatableMethods # rubocop:disable Metrics/ModuleLength
 
   def handle_valid_otp_for_confirmation_context
     user_session[:authn_at] = Time.zone.now
-    Funnel::Registration::AddMfa.call(current_user.id, 'phone')
     assign_phone
+    track_mfa_method_added
+    @next_mfa_setup_path = next_setup_path
     flash[:success] = t('notices.phone_confirmed')
+  end
+
+  def track_mfa_method_added
+    mfa_user = MfaContext.new(current_user)
+    mfa_count = mfa_user.enabled_mfa_methods_count
+    analytics.multi_factor_auth_added_phone(enabled_mfa_methods_count: mfa_count)
+    Funnel::Registration::AddMfa.call(current_user.id, 'phone')
   end
 
   def handle_valid_otp_for_authentication_context
@@ -212,6 +221,7 @@ module TwoFactorAuthenticatableMethods # rubocop:disable Metrics/ModuleLength
   end
 
   def after_otp_verification_confirmation_url
+    return @next_mfa_setup_path if @next_mfa_setup_path
     return account_url if @updating_existing_number
     after_sign_in_path_for(current_user)
   end
@@ -223,8 +233,7 @@ module TwoFactorAuthenticatableMethods # rubocop:disable Metrics/ModuleLength
   end
 
   def mark_user_session_authenticated_analytics(authentication_type)
-    analytics.track_event(
-      Analytics::USER_MARKED_AUTHED,
+    analytics.user_marked_authed(
       authentication_type: authentication_type,
     )
   end

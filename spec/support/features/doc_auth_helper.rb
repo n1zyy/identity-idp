@@ -3,7 +3,8 @@ require_relative 'document_capture_step_helper'
 module DocAuthHelper
   include DocumentCaptureStepHelper
 
-  GOOD_SSN = '900-66-1234'
+  GOOD_SSN = Idp::Constants::MOCK_IDV_APPLICANT_WITH_SSN[:ssn]
+  SSN_THAT_FAILS_RESOLUTION = '123-45-6666'
 
   def session_from_completed_flow_steps(finished_step)
     session = { doc_auth: {} }
@@ -15,7 +16,7 @@ module DocAuthHelper
   end
 
   def fill_out_ssn_form_with_ssn_that_fails_resolution
-    fill_in t('idv.form.ssn_label_html'), with: '123-45-6666'
+    fill_in t('idv.form.ssn_label_html'), with: SSN_THAT_FAILS_RESOLUTION
   end
 
   def fill_out_ssn_form_with_ssn_that_raises_exception
@@ -75,29 +76,46 @@ module DocAuthHelper
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
   end
 
-  def complete_doc_auth_steps_before_agreement_step(expect_accessible: false)
-    complete_doc_auth_steps_before_welcome_step(expect_accessible: expect_accessible)
+  def complete_welcome_step
     click_on t('doc_auth.buttons.continue')
   end
 
-  def complete_doc_auth_steps_before_upload_step(expect_accessible: false)
+  def complete_doc_auth_steps_before_agreement_step(expect_accessible: false)
     complete_doc_auth_steps_before_welcome_step(expect_accessible: expect_accessible)
-    click_on t('doc_auth.buttons.continue')
+    complete_welcome_step
+    expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
+  end
+
+  def complete_agreement_step
     find('label', text: t('doc_auth.instructions.consent', app_name: APP_NAME)).click
     click_on t('doc_auth.buttons.continue')
   end
 
-  def complete_doc_auth_steps_before_document_capture_step(expect_accessible: false)
-    complete_doc_auth_steps_before_upload_step(expect_accessible: expect_accessible)
-    # JavaScript-enabled mobile devices will skip directly to document capture, so stop as complete.
-    return if page.current_path == idv_doc_auth_document_capture_step
+  def complete_doc_auth_steps_before_upload_step(expect_accessible: false)
+    complete_doc_auth_steps_before_agreement_step(expect_accessible: expect_accessible)
+    complete_agreement_step
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
+  end
+
+  def complete_upload_step
     if javascript_enabled?
       # By default, user would be prevented from continuing on desktop if the proofing flow requires
       # liveness and there is no detectable camera. This forces the desktop link to be visible.
       page.find('#upload-comp-liveness-off', visible: :all).evaluate_script('this.className = ""')
     end
     click_on t('doc_auth.info.upload_computer_link')
+  end
+
+  def complete_doc_auth_steps_before_document_capture_step(expect_accessible: false)
+    complete_doc_auth_steps_before_upload_step(expect_accessible: expect_accessible)
+    # JavaScript-enabled mobile devices will skip directly to document capture, so stop as complete.
+    return if page.current_path == idv_doc_auth_document_capture_step
+    complete_upload_step
+    expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
+  end
+
+  def complete_document_capture_step
+    attach_and_submit_images
   end
 
   def complete_doc_auth_steps_before_email_sent_step
@@ -115,21 +133,29 @@ AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1
 
   def complete_doc_auth_steps_before_ssn_step(expect_accessible: false)
     complete_doc_auth_steps_before_document_capture_step(expect_accessible: expect_accessible)
+    complete_document_capture_step
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
-    attach_and_submit_images
+  end
+
+  def complete_ssn_step
+    fill_out_ssn_form_ok
+    click_idv_continue
   end
 
   def complete_doc_auth_steps_before_verify_step(expect_accessible: false)
     complete_doc_auth_steps_before_ssn_step(expect_accessible: expect_accessible)
+    complete_ssn_step
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
-    fill_out_ssn_form_ok
+  end
+
+  def complete_verify_step
     click_idv_continue
   end
 
   def complete_doc_auth_steps_before_address_step(expect_accessible: false)
     complete_doc_auth_steps_before_verify_step
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
-    click_link t('doc_auth.buttons.change_address')
+    click_button t('idv.buttons.change_address_label')
   end
 
   def complete_doc_auth_steps_before_send_link_step
@@ -145,21 +171,22 @@ AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1
 
   def complete_all_doc_auth_steps(expect_accessible: false)
     complete_doc_auth_steps_before_verify_step(expect_accessible: expect_accessible)
+    complete_verify_step
     expect(page).to be_axe_clean.according_to :section508, :"best-practice" if expect_accessible
-    click_idv_continue
   end
 
   def complete_proofing_steps
     complete_all_doc_auth_steps
     click_continue
+    expect(page).to have_current_path(idv_review_path, wait: 10)
     fill_in 'Password', with: RequestHelper::VALID_PASSWORD
     click_continue
-    click_acknowledge_personal_key
+    acknowledge_and_confirm_personal_key
     click_agree_and_continue
   end
 
   def mock_doc_auth_no_name_pii(method)
-    pii_with_no_name = DocAuth::Mock::ResultResponseBuilder::DEFAULT_PII_FROM_DOC.dup
+    pii_with_no_name = Idp::Constants::MOCK_IDV_APPLICANT.dup
     pii_with_no_name[:last_name] = nil
     DocAuth::Mock::DocAuthMockClient.mock_response!(
       method: method,
@@ -181,6 +208,22 @@ AppleWebKit/604.1.38 (KHTML, like Gecko) Version/11.0 Mobile/15A372 Safari/604.1
       response: DocAuth::Response.new(
         success: false,
         errors: { error: I18n.t('doc_auth.errors.general.no_liveness') },
+      ),
+    )
+  end
+
+  def mock_doc_auth_attention_with_barcode
+    attention_with_barcode_response = instance_double(
+      Faraday::Response,
+      status: 200,
+      body: LexisNexisFixtures.true_id_barcode_read_attention,
+    )
+    DocAuth::Mock::DocAuthMockClient.mock_response!(
+      method: :get_results,
+      response: DocAuth::LexisNexis::Responses::TrueIdResponse.new(
+        attention_with_barcode_response,
+        false,
+        DocAuth::LexisNexis::Config.new,
       ),
     )
   end

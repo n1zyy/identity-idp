@@ -15,12 +15,11 @@ en:
       link_sent: Link sent
       otp_delivery: Receive a security code
       processing_images: Processing your images
-      ssn: Enter your Social Security Number
+      ssn: Enter your Social Security number
       switch_back: Switch back to your computer
       take_photo: Take photos of your ID with a phone
       upload: Verify your ID
       verify: Verify your identity
-      verify_info: Verify your information
     edit_info:
       email_language: Edit email language preference
       password: Edit your password
@@ -40,9 +39,10 @@ en:
       phone: Verify your phone number
       reset_password: Reset Password
       review: Re-enter your password
+      verify_info: Verify your information
     mfa_setup:
-      first_authentication_method: You’ve added your first authentication method!
-      multiple_authentication_methods_setup: You’ve added a %{method_count} authentication method!
+      suggest_second_mfa: You’ve added your first authentication method! Add a second
+        method as a backup.
     no_auth_option: No sign-in method found
     openid_connect:
       authorization: OpenID Connect Authorization

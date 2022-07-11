@@ -1,6 +1,7 @@
 import { useContext } from 'react';
 import { t } from '@18f/identity-i18n';
 import { FormError } from '@18f/identity-form-steps';
+import { trackError } from '@18f/identity-analytics';
 import UploadContext from '../context/upload';
 import AnalyticsContext from '../context/analytics';
 
@@ -83,7 +84,7 @@ const withBackgroundEncryptedUpload = (Component) => {
    */
   function ComposedComponent({ onChange, onError, ...props }) {
     const { backgroundUploadURLs, backgroundUploadEncryptKey } = useContext(UploadContext);
-    const { addPageAction, noticeError } = useContext(AnalyticsContext);
+    const { addPageAction } = useContext(AnalyticsContext);
 
     /**
      * @param {Record<string, string|Blob|null|undefined>} nextValues Next values.
@@ -102,24 +103,14 @@ const withBackgroundEncryptedUpload = (Component) => {
             value,
           )
             .catch((error) => {
-              addPageAction({
-                label: 'IdV: document capture async upload encryption',
-                payload: {
-                  success: false,
-                },
-              });
-              noticeError(error);
+              addPageAction('IdV: document capture async upload encryption', { success: false });
+              trackError(error);
 
               // Rethrow error to skip upload and proceed from next `catch` block.
               throw error;
             })
             .then((encryptedValue) => {
-              addPageAction({
-                label: 'IdV: document capture async upload encryption',
-                payload: {
-                  success: true,
-                },
-              });
+              addPageAction('IdV: document capture async upload encryption', { success: true });
 
               return window.fetch(url, {
                 method: 'PUT',
@@ -129,14 +120,10 @@ const withBackgroundEncryptedUpload = (Component) => {
             })
             .then((response) => {
               const traceId = response.headers.get('X-Amzn-Trace-Id');
-              addPageAction({
-                key: 'documentCapture.asyncUpload',
-                label: 'IdV: document capture async upload submitted',
-                payload: {
-                  success: response.ok,
-                  trace_id: traceId,
-                  status_code: response.status,
-                },
+              addPageAction('IdV: document capture async upload submitted', {
+                success: response.ok,
+                trace_id: traceId,
+                status_code: response.status,
               });
 
               if (!response.ok) {

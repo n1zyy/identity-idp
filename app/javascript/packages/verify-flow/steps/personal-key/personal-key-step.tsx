@@ -1,4 +1,5 @@
-import { PageHeading } from '@18f/identity-components';
+import { useContext } from 'react';
+import { Alert, PageHeading } from '@18f/identity-components';
 import { ClipboardButton } from '@18f/identity-clipboard-button';
 import { PrintButton } from '@18f/identity-print-button';
 import { t } from '@18f/identity-i18n';
@@ -7,16 +8,24 @@ import { FormStepsButton } from '@18f/identity-form-steps';
 import type { FormStepComponentProps } from '@18f/identity-form-steps';
 import { getAssetPath } from '@18f/identity-assets';
 import { trackEvent } from '@18f/identity-analytics';
-import type { VerifyFlowValues } from '../..';
+import type { VerifyFlowValues } from '../../verify-flow';
+import AddressVerificationMethodContext from '../../context/address-verification-method-context';
 import DownloadButton from './download-button';
 
 interface PersonalKeyStepProps extends FormStepComponentProps<VerifyFlowValues> {}
 
 function PersonalKeyStep({ value }: PersonalKeyStepProps) {
   const personalKey = value.personalKey!;
+  const { addressVerificationMethod } = useContext(AddressVerificationMethodContext);
 
   return (
     <>
+      {addressVerificationMethod && (
+        <Alert type="success" className="margin-bottom-4">
+          {addressVerificationMethod === 'phone' && t('idv.messages.confirm')}
+          {addressVerificationMethod === 'gpo' && t('idv.messages.mail_sent')}
+        </Alert>
+      )}
       <PageHeading>{t('headings.personal_key')}</PageHeading>
       <p>{t('instructions.personal_key.info')}</p>
       <div className="full-width-box margin-y-5">

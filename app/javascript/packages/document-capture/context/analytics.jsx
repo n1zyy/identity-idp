@@ -1,5 +1,6 @@
 import { createContext } from 'react';
 
+/** @typedef {import('@18f/identity-analytics').trackEvent} TrackEvent */
 /** @typedef {Record<string,string|number|boolean|null|undefined>} Payload */
 
 /**
@@ -11,24 +12,14 @@ import { createContext } from 'react';
  */
 
 /**
- * @typedef {(action: PageAction)=>void} AddPageAction
- */
-
-/**
- * @typedef {(error: Error)=>void} NoticeError
- */
-
-/**
  * @typedef AnalyticsContext
  *
- * @prop {AddPageAction} addPageAction Log an action with optional payload.
- * @prop {NoticeError} noticeError Log an error without affecting application behavior.
+ * @prop {TrackEvent} addPageAction Log an action with optional payload.
  */
 
 const AnalyticsContext = createContext(
   /** @type {AnalyticsContext} */ ({
-    addPageAction: () => {},
-    noticeError: () => {},
+    addPageAction: () => Promise.resolve(),
   }),
 );
 
