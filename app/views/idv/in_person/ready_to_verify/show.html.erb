@@ -53,13 +53,15 @@
       </ul>
       <p><%= t('in_person_proofing.process.state_id.no_other_documents') %></p>
     <% end %>
-    <% c.item(heading: t('in_person_proofing.process.proof_of_address.heading')) do %>
-      <p class="margin-bottom-105"><%= t('in_person_proofing.process.proof_of_address.info') %></p>
-      <ul class="usa-list margin-y-105">
-        <% t('in_person_proofing.process.proof_of_address.acceptable_proof').each do |proof| %>
-          <li><%= proof %></li>
-        <% end %>
-      </ul>
+    <% if @presenter.needs_proof_of_address? %>
+      <% c.item(heading: t('in_person_proofing.process.proof_of_address.heading')) do %>
+        <p class="margin-bottom-105"><%= t('in_person_proofing.process.proof_of_address.info') %></p>
+        <ul class="usa-list margin-y-105">
+          <% t('in_person_proofing.process.proof_of_address.acceptable_proof').each do |proof| %>
+            <li><%= proof %></li>
+          <% end %>
+        </ul>
+      <% end %>
     <% end %>
   <% end %>
   <p>
