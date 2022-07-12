@@ -63,7 +63,7 @@ module Idv
       private
 
       def barcode_image_data
-        Barby::Code128A.new(enrollment_code).to_png(margin: 0)
+        Barby::Code128C.new(enrollment_code).to_png(margin: 0, xdim: 2)
       end
 
       def due_date
