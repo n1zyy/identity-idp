@@ -56,7 +56,7 @@ module Idv
       end
 
       def needs_proof_of_address?
-        # WILLFIX: After LG-6708, return enrollment.current_address_matches_id
+        # WILLFIX: After LG-6708, return negated enrollment.current_address_matches_id
         true
       end
 
