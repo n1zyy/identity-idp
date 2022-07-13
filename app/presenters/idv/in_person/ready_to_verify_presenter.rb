@@ -5,9 +5,6 @@ require 'barby/outputter/png_outputter'
 module Idv
   module InPerson
     class ReadyToVerifyPresenter
-      attr_reader :enrollment
-      delegate :enrollment_code, to: :enrollment
-
       def initialize(enrollment:)
         @enrollment = enrollment
       end
@@ -61,6 +58,9 @@ module Idv
       end
 
       private
+
+      attr_reader :enrollment
+      delegate :enrollment_code, to: :enrollment
 
       def barcode_image_data
         Barby::Code128C.new(enrollment_code).to_png(margin: 0, xdim: 2)
