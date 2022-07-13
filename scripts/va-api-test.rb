@@ -11,7 +11,6 @@ class VaApiTest
     headers = { Authorization: "Bearer #{jwt_token}" }
 
     response = Net::HTTP.get_response(uri, headers)
-    binding.pry
     decrypt_payload(response)
   end
 
