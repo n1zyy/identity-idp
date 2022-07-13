@@ -27,12 +27,24 @@ class VaApiTest
   end
 
   def private_key
-    if Identity::Hostdata.in_datacenter? || !File.exist?('tmp/va_ip.key')
-      AppArtifacts.store.oidc_private_key
-    else
-      OpenSSL::PKey::RSA.new(File.read('tmp/va_ip.key'))
-    end
+    return AppArtifacts.store.oidc_private_key if private_key_store?
+
+    OpenSSL::PKey::RSA.new(File.read(private_key_file))
+  end
+
+  # Returns true if a private key store should be used
+  # (as opposed to the private key file).
+  def private_key_store?
+    Identity::Hostdata.in_datacenter? || !private_key_file?
+  end
+
+  def private_key_file?
+    File.exist?(private_key_file)
+  end
+
+  def private_key_file
+    @private_key_file ||= 'tmp/va_ip.key'
   end
 end
 
-puts(VaApiTest.new.run) if $PROGRAM_NAME == __FILE__
+puts(VaApiTest.new.run || 'VaApiTest#run returned no output') if $PROGRAM_NAME == __FILE__
