@@ -23,7 +23,7 @@ module Idv
         InPersonEnrollment.new(
           user: current_user,
           profile: current_user.profiles.last,
-          enrollment_code: '1590000038901989',
+          enrollment_code: '2048702198804358',
           created_at: Time.zone.now,
         )
       end

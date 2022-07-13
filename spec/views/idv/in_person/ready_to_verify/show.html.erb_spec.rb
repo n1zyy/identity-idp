@@ -5,7 +5,7 @@ describe 'idv/in_person/ready_to_verify/show.html.erb' do
 
   let(:user) { build(:user) }
   let(:profile) { build(:profile, user: user) }
-  let(:enrollment_code) { '1234000056780000' }
+  let(:enrollment_code) { '2048702198804358' }
   let(:current_address_matches_id) { true }
   let(:created_at) { Time.zone.parse('2022-07-13') }
   let(:enrollment) do

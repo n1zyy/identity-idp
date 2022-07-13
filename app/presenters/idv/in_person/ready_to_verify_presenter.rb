@@ -18,7 +18,7 @@ module Idv
       end
 
       def formatted_enrollment_code
-        enrollment_code.gsub(/(\d{4})/, '\1-').chomp('-')
+        EnrollmentCodeFormatter.format(enrollment_code)
       end
 
       def selected_location_details

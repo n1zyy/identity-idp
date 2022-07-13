@@ -39,7 +39,7 @@ describe Idv::InPerson::ReadyToVerifyController do
           InPersonEnrollment.new(
             user: user,
             profile: profile,
-            enrollment_code: '1234000056780000',
+            enrollment_code: '2048702198804358',
             created_at: Time.zone.now,
           )
         end

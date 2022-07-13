@@ -5,6 +5,10 @@ RSpec.describe 'In Person Proofing' do
   include IdvHelper
   include InPersonHelper
 
+  around do |example|
+    freeze_time { example.run }
+  end
+
   before do
     allow(IdentityConfig.store).to receive(:in_person_proofing_enabled).and_return(true)
   end
@@ -104,7 +108,12 @@ RSpec.describe 'In Person Proofing' do
     acknowledge_and_confirm_personal_key
 
     # ready to verify page
+    enrollment_code = JSON.parse(UspsIppFixtures.request_enrollment_code_response)['enrollmentCode']
+    deadline = (Time.zone.now + IdentityConfig.store.in_person_enrollment_validity_in_days.days).
+      strftime(t('time.formats.event_date'))
     expect(page).to have_content(t('in_person_proofing.headings.barcode'))
+    expect(page).to have_content(Idv::InPerson::EnrollmentCodeFormatter.format(enrollment_code))
+    expect(page).to have_content(t('in_person_proofing.body.barcode.deadline', deadline: deadline))
   end
 
   def attach_images_that_fail

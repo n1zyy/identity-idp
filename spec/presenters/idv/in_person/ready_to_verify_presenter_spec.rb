@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe Idv::InPerson::ReadyToVerifyPresenter do
   let(:user) { build(:user) }
   let(:profile) { build(:profile, user: user) }
-  let(:enrollment_code) { '1234000056780000' }
+  let(:enrollment_code) { '2048702198804358' }
   let(:current_address_matches_id) { true }
   let(:created_at) { Time.zone.parse('2022-07-13') }
   let(:enrollment) do
@@ -37,7 +37,9 @@ RSpec.describe Idv::InPerson::ReadyToVerifyPresenter do
     subject(:formatted_enrollment_code) { presenter.formatted_enrollment_code }
 
     it 'returns a formatted enrollment code' do
-      expect(formatted_enrollment_code).to eq '1234-0000-5678-0000'
+      expect(formatted_enrollment_code).to eq(
+        Idv::InPerson::EnrollmentCodeFormatter.format(enrollment_code),
+      )
     end
   end
 
