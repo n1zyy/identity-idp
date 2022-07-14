@@ -6,12 +6,17 @@ module OpenidConnect
 
     def index
       @logout_form = OpenidConnectLogoutForm.new(logout_params)
-
+      current_user
       result = @logout_form.submit
 
       analytics.logout_initiated(**result.to_h.except(:redirect_uri))
 
       if result.success? && (redirect_uri = result.extra[:redirect_uri])
+        irs_attempts_api_tracker.logout(
+          user_uuid: current_user.uuid,
+          unique_session_id: current_user.unique_session_id, # do we want this???
+          success: true,
+          )
         sign_out
         redirect_to redirect_uri unless logout_params[:prevent_logout_redirect] == 'true'
       else

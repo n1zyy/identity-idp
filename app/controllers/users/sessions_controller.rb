@@ -40,6 +40,7 @@ module Users
 
     def destroy
       analytics.logout_initiated(sp_initiated: false, oidc: false)
+      # handle logout here?
       super
     end
 
