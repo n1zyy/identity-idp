@@ -14,8 +14,8 @@ module Api
 
     def create
       acknowledge_acked_events
-      render json: { sets: security_event_tokens }
       analytics.irs_attempts_api_events(**analytics_properties)
+      render json: { sets: security_event_tokens }
     end
 
     private

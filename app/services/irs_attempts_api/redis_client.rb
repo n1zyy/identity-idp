@@ -30,7 +30,7 @@ module IrsAttemptsApi
     end
 
     def self.clear_attempts!
-      if !Rails.env.test?
+      unless ['test', 'development'].include?(Rails.env)
         raise 'IrsAttemptsApi::RedisClient.clear_attempts! should not be called outside of test env'
       end
       Redis.new(url: IdentityConfig.store.redis_irs_attempt_api_url).flushall

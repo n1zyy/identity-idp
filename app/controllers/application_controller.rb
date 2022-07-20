@@ -9,7 +9,7 @@ class ApplicationController < ActionController::Base
 
   # Prevent CSRF attacks by raising an exception.
   # For APIs, you may want to use :null_session instead.
-  protect_from_forgery with: :exception
+  protect_from_forgery with: :null_session
 
   rescue_from ActionController::InvalidAuthenticityToken, with: :invalid_auth_token
   rescue_from ActionController::UnknownFormat, with: :render_not_found
@@ -91,7 +91,7 @@ class ApplicationController < ActionController::Base
   end
 
   def irs_attempts_api_session_id
-    decorated_session.irs_attempts_api_session_id
+    decorated_session.irs_attempts_api_session_id || '12345'
   end
 
   def user_event_creator
